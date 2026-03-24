@@ -1,0 +1,32 @@
+<%- include('partials/header', { title: "Order Submitted" }) %>
+
+<section class="card success-card">
+  <h1>Order Submitted</h1>
+  <p>Your order <strong>#<%= order.id %></strong> has been received and is now pending payment approval.</p>
+  <% if (accountCreated) { %>
+    <p><strong>Your account was created successfully using <%= order.buyerEmail %>.</strong></p>
+  <% } %>
+  <p>Items Subtotal: <strong><%= formatCurrency(order.itemSubtotal || order.totalAmount) %></strong></p>
+  <p>Delivery Area: <strong><%= formatDeliveryArea(order.deliveryArea) %></strong></p>
+  <p>Delivery Fee: <strong><%= formatCurrency(order.deliveryFee || 0) %></strong></p>
+  <p>Grand Total: <strong><%= formatCurrency(order.grandTotal || order.totalAmount) %></strong></p>
+
+  <h2>What happens next</h2>
+  <ol>
+    <li>Admin reviews your payment details and screenshot.</li>
+    <li>When approved, your order status changes to approved.</li>
+    <li>An email confirmation is sent to <strong><%= order.buyerEmail %></strong>.</li>
+  </ol>
+
+  <% if (!pendingEmailSent) { %>
+    <p class="muted">SMTP is not configured or email sending failed, so only approval email may be delayed.</p>
+  <% } %>
+
+  <a class="button button-primary" href="/">Continue Shopping</a>
+</section>
+
+<script>
+  localStorage.removeItem("preloved_cart");
+</script>
+
+<%- include('partials/footer') %>

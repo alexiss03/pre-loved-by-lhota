@@ -1,0 +1,22 @@
+<%- include('partials/header', { title: "Admin Login" }) %>
+
+<section class="card auth-card">
+  <h1>Admin Login</h1>
+  <p>Approve payments and notify buyers by email.</p>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <form action="/admin/login" method="POST">
+    <label for="email">Admin Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required />
+
+    <button type="submit" class="button button-primary button-block">Login</button>
+  </form>
+</section>
+
+<%- include('partials/footer') %>

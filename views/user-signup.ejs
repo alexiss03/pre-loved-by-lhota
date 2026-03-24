@@ -1,0 +1,36 @@
+<%- include('partials/header', { title: "Sign Up" }) %>
+
+<section class="card auth-card">
+  <h1>Sign Up</h1>
+  <p>Create your buyer account.</p>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <form action="/signup" method="POST">
+    <label for="fullName">Full Name</label>
+    <input id="fullName" name="fullName" value="<%= form.fullName || '' %>" required />
+
+    <label for="email">Email Address</label>
+    <input id="email" name="email" type="email" value="<%= form.email || '' %>" required />
+
+    <label for="phone">Phone Number</label>
+    <input id="phone" name="phone" value="<%= form.phone || '' %>" required />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" minlength="8" required />
+
+    <label for="passwordConfirm">Confirm Password</label>
+    <input id="passwordConfirm" name="passwordConfirm" type="password" minlength="8" required />
+
+    <button type="submit" class="button button-primary button-block">Create Account</button>
+  </form>
+
+  <p class="muted">
+    Already have an account?
+    <a href="/login">Login</a>
+  </p>
+</section>
+
+<%- include('partials/footer') %>

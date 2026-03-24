@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= title %></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="announcement-bar">
+        <span class="announcement-arrow">&#8249;</span>
+        <span>FREE STANDARD SHIPPING ON ALL ORDERS</span>
+        <span class="announcement-arrow">&#8250;</span>
+      </div>
+      <div class="container nav-row">
+        <a class="brand" href="/" aria-label="Pre-loved by Lhota">
+          <img class="brand-logo" src="/assets/logo-preloved-lhota.svg" alt="Pre-loved by Lhota" />
+        </a>
+        <nav class="nav-links">
+          <a class="main-nav-link" href="/shop">Shop</a>
+          <a class="main-nav-link" href="/shop/clothes">Clothes</a>
+          <a class="main-nav-link" href="/shop/bags">Bags</a>
+          <a class="main-nav-link" href="/shop/miscellaneous">Miscellaneous</a>
+          <a class="main-nav-link" href="/cart">Cart</a>
+        </nav>
+        <div class="nav-icons">
+          <a href="/shop" aria-label="Search">&#128269;</a>
+          <% if (buyerUser) { %>
+            <a href="/logout">Logout</a>
+          <% } else { %>
+            <a href="/login">Login</a>
+            <a href="/signup">Sign Up</a>
+          <% } %>
+        </div>
+      </div>
+    </header>
+    <main class="container page-content">

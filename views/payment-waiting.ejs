@@ -1,0 +1,22 @@
+<%- include('partials/header', { title: "Payment Waiting - Pre-loved by Lhota" }) %>
+
+<section class="card success-card">
+  <h1>PayMongo Payment</h1>
+  <p>
+    Product: <strong><%= item.name %></strong>
+  </p>
+  <p>
+    Price: <strong><%= formatCurrency(item.price) %></strong>
+  </p>
+  <p class="muted">Continue to PayMongo to complete payment, then return using the callback link.</p>
+
+  <div class="payment-waiting-actions">
+    <a class="button button-primary" href="<%= item.paymongoLink %>" target="_blank" rel="noopener noreferrer">Open PayMongo Checkout</a>
+    <a class="button button-secondary" href="<%= callbackUrl %>">Simulate Callback</a>
+    <a class="button" href="/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
+  </div>
+
+  <p class="muted"><strong>Callback URL:</strong> <code><%= callbackUrl %></code></p>
+</section>
+
+<%- include('partials/footer') %>

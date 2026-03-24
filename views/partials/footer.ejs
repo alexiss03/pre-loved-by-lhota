@@ -1,0 +1,211 @@
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <section>
+          <h3>Pre-loved by Lhota</h3>
+          <p>Timeless preloved pieces in a soft, curated collection.</p>
+        </section>
+        <section>
+          <h3>Shop</h3>
+          <p><a href="/shop/clothes">Clothes</a></p>
+          <p><a href="/shop/bags">Bags</a></p>
+          <p><a href="/shop/miscellaneous">Miscellaneous</a></p>
+        </section>
+        <section>
+          <h3>Support</h3>
+          <p><a href="/cart">Checkout</a></p>
+          <p>Manual payment approval</p>
+          <p>Email updates included</p>
+        </section>
+      </div>
+    </footer>
+    <a
+      id="floating-cart-button"
+      class="floating-cart-button"
+      href="/cart"
+      aria-label="Open cart summary"
+      aria-controls="cart-summary-sheet"
+    >
+      <span aria-hidden="true">&#128717;</span>
+      <span>Cart</span>
+      <span id="floating-cart-count" class="floating-cart-count">0</span>
+    </a>
+
+    <div id="cart-summary-sheet" class="cart-summary-sheet" aria-hidden="true">
+      <button id="cart-summary-backdrop" class="cart-summary-backdrop" type="button" aria-label="Close cart summary"></button>
+      <section class="cart-summary-panel" role="dialog" aria-modal="true" aria-labelledby="cart-summary-title">
+        <div class="cart-summary-head">
+          <h3 id="cart-summary-title">Cart Summary</h3>
+          <div class="cart-summary-head-actions">
+            <button id="cart-summary-expand" class="cart-summary-icon" type="button" aria-label="Expand summary">⤢</button>
+            <button id="cart-summary-close" class="cart-summary-icon" type="button" aria-label="Close summary">x</button>
+          </div>
+        </div>
+        <p id="cart-summary-meta" class="cart-summary-meta">0 piece(s)</p>
+        <div id="cart-summary-list" class="cart-summary-list"></div>
+        <div class="cart-summary-foot">
+          <p>Total: <strong id="cart-summary-total">PHP 0.00</strong></p>
+          <div class="cart-summary-buttons">
+            <a class="button button-secondary" href="/cart">View Cart</a>
+            <a class="button button-primary" href="/cart">Checkout</a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      (function () {
+        const CART_KEY = "preloved_cart";
+        const floatingCart = document.getElementById("floating-cart-button");
+        const floatingCount = document.getElementById("floating-cart-count");
+        const summarySheet = document.getElementById("cart-summary-sheet");
+        const summaryBackdrop = document.getElementById("cart-summary-backdrop");
+        const summaryClose = document.getElementById("cart-summary-close");
+        const summaryExpand = document.getElementById("cart-summary-expand");
+        const summaryList = document.getElementById("cart-summary-list");
+        const summaryMeta = document.getElementById("cart-summary-meta");
+        const summaryTotal = document.getElementById("cart-summary-total");
+
+        if (!floatingCart) {
+          return;
+        }
+
+        function toMoney(value) {
+          return `PHP ${Number(value || 0).toFixed(2)}`;
+        }
+
+        function getCart() {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(CART_KEY));
+            if (Array.isArray(parsed)) {
+              return parsed;
+            }
+          } catch (_error) {
+            return [];
+          }
+          return [];
+        }
+
+        function getCatalogMap() {
+          const rawCatalog = Array.isArray(window.ITEM_CATALOG) ? window.ITEM_CATALOG : [];
+          const map = new Map();
+          rawCatalog.forEach((item) => {
+            map.set(String(item.id), item);
+          });
+          return map;
+        }
+
+        function renderSummary() {
+          const cart = getCart();
+          const catalogMap = getCatalogMap();
+          let pieceCount = 0;
+          let amountTotal = 0;
+
+          const rows = cart
+            .filter((entry) => entry && entry.itemId && Number(entry.quantity) > 0)
+            .map((entry) => {
+              const itemId = String(entry.itemId);
+              const qty = Number(entry.quantity) || 0;
+              const product = catalogMap.get(itemId);
+              const name = product ? product.name : itemId;
+              const price = product ? Number(product.price) || 0 : 0;
+              const subtotal = qty * price;
+
+              pieceCount += qty;
+              amountTotal += subtotal;
+
+              const priceText = product ? toMoney(subtotal) : "-";
+              return `<div class="cart-summary-row"><span>${name} x${qty}</span><strong>${priceText}</strong></div>`;
+            });
+
+          if (floatingCount) {
+            floatingCount.textContent = String(pieceCount);
+          }
+
+          if (summaryMeta) {
+            summaryMeta.textContent = `${pieceCount} piece(s)`;
+          }
+
+          if (summaryTotal) {
+            summaryTotal.textContent = toMoney(amountTotal);
+          }
+
+          if (summaryList) {
+            summaryList.innerHTML =
+              rows.length > 0
+                ? rows.join("")
+                : '<p class="cart-summary-empty">Your cart is empty.</p>';
+          }
+        }
+
+        function openSummary() {
+          if (!summarySheet) {
+            window.location.href = "/cart";
+            return;
+          }
+          renderSummary();
+          summarySheet.classList.add("is-open");
+          summarySheet.setAttribute("aria-hidden", "false");
+        }
+
+        function closeSummary() {
+          if (!summarySheet) {
+            return;
+          }
+          summarySheet.classList.remove("is-open");
+          summarySheet.classList.remove("is-expanded");
+          summarySheet.setAttribute("aria-hidden", "true");
+          if (summaryExpand) {
+            summaryExpand.textContent = "⤢";
+            summaryExpand.setAttribute("aria-label", "Expand summary");
+          }
+        }
+
+        function toggleExpand() {
+          if (!summarySheet) {
+            return;
+          }
+          const expanded = summarySheet.classList.toggle("is-expanded");
+          if (summaryExpand) {
+            summaryExpand.textContent = expanded ? "⤡" : "⤢";
+            summaryExpand.setAttribute("aria-label", expanded ? "Collapse summary" : "Expand summary");
+          }
+        }
+
+        const path = window.location.pathname || "";
+        if (path === "/cart" || path.startsWith("/admin")) {
+          floatingCart.style.display = "none";
+          if (summarySheet) {
+            summarySheet.style.display = "none";
+          }
+          return;
+        }
+
+        floatingCart.addEventListener("click", (event) => {
+          event.preventDefault();
+          openSummary();
+        });
+        if (summaryBackdrop) {
+          summaryBackdrop.addEventListener("click", closeSummary);
+        }
+        if (summaryClose) {
+          summaryClose.addEventListener("click", closeSummary);
+        }
+        if (summaryExpand) {
+          summaryExpand.addEventListener("click", toggleExpand);
+        }
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            closeSummary();
+          }
+        });
+
+        window.addEventListener("storage", renderSummary);
+        window.addEventListener("focus", renderSummary);
+        window.addEventListener("preloved-cart-updated", renderSummary);
+        renderSummary();
+      })();
+    </script>
+  </body>
+</html>

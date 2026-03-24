@@ -1,0 +1,26 @@
+<%- include('partials/header', { title: "Payment Callback - Pre-loved by Lhota" }) %>
+
+<section class="card success-card">
+  <h1>Payment Callback Received</h1>
+  <p>Status: <strong><%= statusLabel %></strong></p>
+
+  <% if (item) { %>
+    <p>Product: <strong><%= item.name %></strong></p>
+    <p>Price: <strong><%= formatCurrency(item.price) %></strong></p>
+  <% } else { %>
+    <p class="muted">No product was matched for this callback.</p>
+  <% } %>
+
+  <p class="muted">
+    Raw status code: <code><%= status %></code>
+  </p>
+
+  <div class="payment-waiting-actions">
+    <% if (item) { %>
+      <a class="button button-primary" href="/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
+    <% } %>
+    <a class="button" href="/shop">Continue Shopping</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

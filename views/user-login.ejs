@@ -1,0 +1,32 @@
+<%- include('partials/header', { title: "User Login" }) %>
+
+<section class="card auth-card">
+  <h1>User Login</h1>
+  <p>Sign in to your buyer account.</p>
+
+  <% if (message) { %>
+    <div class="alert alert-success"><%= message %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <form action="/login" method="POST">
+    <input type="hidden" name="redirectTo" value="<%= redirectTo || '/' %>" />
+
+    <label for="email">Email Address</label>
+    <input id="email" name="email" type="email" value="<%= email || '' %>" required />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required />
+
+    <button type="submit" class="button button-primary button-block">Login</button>
+  </form>
+
+  <p class="muted">
+    No account yet?
+    <a href="/signup">Sign up here</a>
+  </p>
+</section>
+
+<%- include('partials/footer') %>

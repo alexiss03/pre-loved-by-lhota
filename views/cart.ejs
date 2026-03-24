@@ -1,0 +1,201 @@
+<%- include('partials/header', { title: "Checkout - Pre-loved by Lhota" }) %>
+
+<section class="section-head">
+  <h1>Checkout</h1>
+  <p>Upload your payment proof. Orders are manually approved by admin before confirmation.</p>
+</section>
+
+<% if (error) { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<div class="checkout-layout">
+  <section class="card">
+    <h2>Your Cart</h2>
+    <div id="cart-empty" class="muted">Your cart is empty.</div>
+    <div id="cart-items"></div>
+    <div class="cart-totals">
+      <p>Items Subtotal: <strong id="cart-subtotal">PHP 0.00</strong></p>
+      <p>Detected Area: <strong id="detected-area">-</strong></p>
+      <p>Delivery Fee: <strong id="delivery-fee">PHP 0.00</strong></p>
+      <p class="cart-total">Grand Total: <strong id="cart-grand-total">PHP 0.00</strong></p>
+    </div>
+    <p class="muted">Need to add items first? <a href="/">Back to shop</a></p>
+  </section>
+
+  <section class="card">
+    <h2>Checkout Details</h2>
+    <form id="checkout-form" class="checkout-form" action="/checkout" method="POST" enctype="multipart/form-data">
+      <input type="hidden" id="cartDataInput" name="cartData" />
+
+      <div class="checkout-form-section">
+        <h3>Account Option</h3>
+        <% if (buyerUser) { %>
+          <p class="muted">
+            Logged in as <strong><%= buyerUser.email %></strong>. This checkout will be linked to your account.
+          </p>
+          <input type="hidden" name="checkoutMode" value="GUEST" />
+        <% } else { %>
+          <div class="checkout-mode-row">
+            <label class="inline-choice">
+              <input type="radio" name="checkoutMode" value="GUEST" checked />
+              <span>Checkout as Guest</span>
+            </label>
+            <label class="inline-choice">
+              <input type="radio" name="checkoutMode" value="CREATE_ACCOUNT" />
+              <span>Create Account</span>
+            </label>
+          </div>
+          <p class="muted">Create Account saves your details for faster checkout next time.</p>
+
+          <div id="account-fields" class="account-fields" hidden>
+            <label for="accountPassword">Create Password</label>
+            <input id="accountPassword" name="accountPassword" type="password" minlength="8" />
+
+            <label for="accountPasswordConfirm">Confirm Password</label>
+            <input id="accountPasswordConfirm" name="accountPasswordConfirm" type="password" minlength="8" />
+            <p class="muted">Password must be at least 8 characters.</p>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="checkout-form-section">
+        <h3>Buyer Information</h3>
+        <label for="buyerName">Full Name</label>
+        <input id="buyerName" name="buyerName" value="<%= buyerUser ? buyerUser.fullName : '' %>" required />
+
+        <label for="buyerEmail">Email Address</label>
+        <input id="buyerEmail" name="buyerEmail" type="email" value="<%= buyerUser ? buyerUser.email : '' %>" required />
+
+        <label for="buyerPhone">Phone Number</label>
+        <input id="buyerPhone" name="buyerPhone" value="<%= buyerUser ? buyerUser.phone : '' %>" required />
+      </div>
+
+      <div class="checkout-form-section">
+        <h3>Delivery Location</h3>
+        <label for="deliveryRegionCode">Region</label>
+        <select id="deliveryRegionCode" name="deliveryRegionCode" required>
+          <option value="">Loading regions...</option>
+        </select>
+
+        <label for="deliveryCityCode">City / Municipality</label>
+        <select id="deliveryCityCode" name="deliveryCityCode" required disabled>
+          <option value="">Select region first</option>
+        </select>
+
+        <label for="deliveryBarangayCode">Barangay</label>
+        <select id="deliveryBarangayCode" name="deliveryBarangayCode" required disabled>
+          <option value="">Select city first</option>
+        </select>
+
+        <label for="deliveryAddressLine">Street / House / Unit</label>
+        <textarea id="deliveryAddressLine" name="deliveryAddressLine" rows="2" required></textarea>
+
+        <input id="deliveryRegion" name="deliveryRegion" type="hidden" />
+        <input id="deliveryCity" name="deliveryCity" type="hidden" />
+        <input id="deliveryBarangay" name="deliveryBarangay" type="hidden" />
+        <input id="deliveryArea" name="deliveryArea" type="hidden" />
+        <input id="deliveryAddress" name="deliveryAddress" type="hidden" />
+        <p id="location-load-status" class="muted location-status">Loading Philippine location list from internet...</p>
+      </div>
+
+      <div class="checkout-form-section">
+        <h3>Payment</h3>
+
+        <p id="paymongo-checkout-status" class="muted" hidden></p>
+        <a
+          id="paymongo-checkout-link"
+          class="button button-secondary"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >
+          Open PayMongo Checkout
+        </a>
+
+        <label for="gcashNumber">Your Payment Number</label>
+        <input id="gcashNumber" name="gcashNumber" required />
+
+        <label for="gcashReference">Payment Reference Number</label>
+        <input id="gcashReference" name="gcashReference" required />
+
+        <label for="paymentProof">Upload Payment Screenshot</label>
+        <input id="paymentProof" name="paymentProof" type="file" accept="image/*" required />
+      </div>
+
+      <button type="submit" class="button button-primary button-block">Submit Order</button>
+    </form>
+  </section>
+</div>
+
+<section class="catalog-section light-panel checkout-shopping">
+  <div class="section-head section-center">
+    <h2>Shop More While Checking Out</h2>
+    <p>Add more items here without leaving this checkout page.</p>
+  </div>
+
+  <div class="checkout-shop-filters">
+    <input id="checkout-shop-search" type="text" placeholder="Search items..." />
+    <select id="checkout-shop-category">
+      <option value="ALL">All Categories</option>
+      <% [...new Set(items.map((item) => item.category))].forEach((category) => { %>
+        <option value="<%= category %>"><%= category %></option>
+      <% }) %>
+    </select>
+  </div>
+
+  <p id="checkout-shop-feedback" class="checkout-shop-feedback" hidden></p>
+  <p id="checkout-shop-empty" class="muted" hidden>No items found for your filter.</p>
+
+  <div class="item-grid" id="checkout-shop-grid">
+    <% items.forEach((item) => { %>
+      <article
+        class="item-card checkout-shop-item"
+        data-category="<%= item.category %>"
+        data-name="<%= item.name.toLowerCase() %>"
+        data-description="<%= item.description.toLowerCase() %>"
+      >
+        <a class="item-image-link" href="/product/<%= encodeURIComponent(item.id) %>">
+          <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+        </a>
+        <div class="item-card-body">
+          <span class="item-category"><%= item.category %></span>
+          <h3><a class="item-title-link" href="/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <p class="item-description"><%= item.description %></p>
+          <p class="stock-text"><%= item.stock %> pieces available</p>
+          <p class="price"><%= formatCurrency(item.price) %></p>
+          <div class="piece-controls">
+            <label class="piece-label" for="checkout-pieces-<%= item.id %>">Pieces</label>
+            <input
+              id="checkout-pieces-<%= item.id %>"
+              class="piece-input checkout-piece-input"
+              type="number"
+              min="1"
+              max="<%= item.stock %>"
+              value="1"
+              <%= item.stock < 1 ? "disabled" : "" %>
+            />
+          </div>
+          <button
+            class="button button-primary checkout-add-to-cart"
+            data-item-id="<%= item.id %>"
+            <%= item.stock < 1 ? "disabled" : "" %>
+          >
+            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+          </button>
+          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<script>
+  window.ITEM_CATALOG = <%- itemsJson %>;
+  window.DELIVERY_FEES = <%- JSON.stringify(deliveryFees) %>;
+  window.PAYMONGO_CHECKOUT = <%- JSON.stringify(paymongoCheckout || { step: 50, links: {} }) %>;
+</script>
+<script src="/js/cart.js"></script>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,139 @@
+<%- include('partials/header', { title: "Shop - Pre-loved by Lhota" }) %>
+
+<%
+  function toKey(value) {
+    return String(value || "").toUpperCase();
+  }
+
+  function categoryHref(value) {
+    const key = toKey(value);
+    if (key === "CLOTHES") {
+      return "/shop/clothes";
+    }
+    if (key === "BAGS") {
+      return "/shop/bags";
+    }
+    if (key === "MISCELLANEOUS") {
+      return "/shop/miscellaneous";
+    }
+    return `/shop?category=${encodeURIComponent(key)}`;
+  }
+%>
+
+<section class="section-head shop-head">
+  <h1>Shop All Items</h1>
+  <p><%= resultsCount %> item(s) found out of <%= totalCount %>.</p>
+</section>
+
+<section class="card shop-filters-card">
+  <form class="shop-filters" action="/shop" method="GET">
+    <div class="shop-filter-field shop-filter-search">
+      <label for="q">Search</label>
+      <input id="q" name="q" type="text" placeholder="Search item name, category, or description" value="<%= filters.q %>" />
+    </div>
+
+    <div class="shop-filter-field">
+      <label for="minPrice">Min Price</label>
+      <input id="minPrice" name="minPrice" type="number" min="0" step="1" value="<%= filters.minPrice %>" />
+    </div>
+
+    <div class="shop-filter-field">
+      <label for="maxPrice">Max Price</label>
+      <input id="maxPrice" name="maxPrice" type="number" min="0" step="1" value="<%= filters.maxPrice %>" />
+    </div>
+
+    <div class="shop-filter-field">
+      <label for="sort">Sort</label>
+      <select id="sort" name="sort">
+        <option value="name_asc" <%= filters.sortBy === "name_asc" ? "selected" : "" %>>Name A-Z</option>
+        <option value="name_desc" <%= filters.sortBy === "name_desc" ? "selected" : "" %>>Name Z-A</option>
+        <option value="price_asc" <%= filters.sortBy === "price_asc" ? "selected" : "" %>>Price Low to High</option>
+        <option value="price_desc" <%= filters.sortBy === "price_desc" ? "selected" : "" %>>Price High to Low</option>
+      </select>
+    </div>
+
+    <div class="shop-filter-field shop-filter-inline">
+      <label class="inline-choice">
+        <input type="checkbox" name="inStock" value="1" <%= filters.inStockOnly ? "checked" : "" %> />
+        <span>In stock only</span>
+      </label>
+    </div>
+
+    <div class="shop-filter-field shop-filter-inline">
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="ALL" <%= selectedCategoryKey === "ALL" ? "selected" : "" %>>All Categories</option>
+        <% categories.forEach((category) => { %>
+          <% const key = toKey(category); %>
+          <option value="<%= key %>" <%= selectedCategoryKey === key ? "selected" : "" %>><%= category %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="shop-filter-actions">
+      <button class="button button-primary" type="submit">Apply Filters</button>
+      <a class="button" href="/shop">Reset</a>
+    </div>
+  </form>
+
+  <div class="shop-category-tabs">
+    <a class="shop-tab <%= selectedCategoryKey === "ALL" ? "active" : "" %>" href="/shop">All</a>
+    <% categories.forEach((category) => { %>
+      <% const key = toKey(category); %>
+      <a class="shop-tab <%= selectedCategoryKey === key ? "active" : "" %>" href="<%= categoryHref(key) %>"><%= category %></a>
+    <% }) %>
+  </div>
+</section>
+
+<section class="catalog-section">
+  <% if (items.length === 0) { %>
+    <div class="card">
+      <p>No items found for your current filters. Try adjusting search or price range.</p>
+    </div>
+  <% } %>
+
+  <div class="item-grid">
+    <% items.forEach((item) => { %>
+      <article class="item-card">
+        <a class="item-image-link" href="/product/<%= encodeURIComponent(item.id) %>">
+          <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+        </a>
+        <div class="item-card-body">
+          <span class="item-category"><%= item.category %></span>
+          <h3><a class="item-title-link" href="/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <p class="item-description"><%= item.description %></p>
+          <p class="stock-text"><%= item.stock %> pieces available</p>
+          <p class="price"><%= formatCurrency(item.price) %></p>
+          <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
+            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+          </button>
+          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<div id="cart-modal" class="cart-modal" aria-hidden="true">
+  <div class="cart-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cart-modal-title">
+    <button id="cart-modal-close" class="cart-modal-close" type="button" aria-label="Close confirmation">x</button>
+    <h3 id="cart-modal-title">Add to Cart</h3>
+    <p id="cart-modal-message">How many pieces would you like to add?</p>
+    <div class="cart-modal-pieces">
+      <label for="cart-modal-pieces-input">Pieces</label>
+      <input id="cart-modal-pieces-input" type="number" min="1" value="1" />
+    </div>
+    <div class="cart-modal-actions">
+      <button id="cart-modal-cancel" class="button button-secondary" type="button">Cancel</button>
+      <button id="cart-modal-confirm" class="button button-primary" type="button">Confirm Add</button>
+    </div>
+    <a class="button" href="/cart">Go to Cart</a>
+  </div>
+</div>
+
+<script>
+  window.ITEM_CATALOG = <%- allItemsJson %>;
+</script>
+<script src="/js/storefront.js"></script>
+
+<%- include('partials/footer') %>

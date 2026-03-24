@@ -1,0 +1,751 @@
+<%- include('partials/header', { title: "Admin Orders" }) %>
+
+<section class="section-head admin-header">
+  <div>
+    <h1>Admin Orders Dashboard</h1>
+    <p>Manage payment approvals, delivery progress, and buyer updates.</p>
+  </div>
+  <form action="/admin/logout" method="POST">
+    <button class="button" type="submit">Logout</button>
+  </form>
+</section>
+
+<% if (message) { %>
+  <div class="alert alert-success"><%= message %></div>
+<% } %>
+<% if (error) { %>
+  <div class="alert alert-error"><%= error %></div>
+<% } %>
+
+<nav class="admin-tabs" aria-label="Admin sections" role="tablist">
+  <button type="button" class="admin-tab-button is-active" data-admin-tab-trigger="orders" role="tab" aria-selected="true">
+    Orders
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="email" role="tab" aria-selected="false">
+    Email
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="inventory" role="tab" aria-selected="false">
+    Inventory
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="facebook" role="tab" aria-selected="false">
+    Facebook
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="links" role="tab" aria-selected="false">
+    Direct Links
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="archived" role="tab" aria-selected="false">
+    Archived
+  </button>
+</nav>
+
+<section class="card admin-tab-panel" data-admin-tab="email">
+  <h2>SMTP Email Settings</h2>
+  <p class="muted"><strong>Status:</strong> <%= smtpStatus.configured ? "Configured" : "Needs Setup" %></p>
+  <p class="muted"><strong>Source:</strong> <%= smtpStatus.sourceLabel || "Environment (.env)" %></p>
+  <p class="muted"><%= smtpStatus.message %></p>
+
+  <form class="smtp-settings-form" action="/admin/smtp/settings" method="POST">
+    <div class="smtp-settings-grid">
+      <div>
+        <label for="smtpHost">SMTP Host</label>
+        <input id="smtpHost" name="smtpHost" placeholder="smtp.gmail.com" value="<%= smtpSettings.host %>" />
+      </div>
+      <div>
+        <label for="smtpPort">SMTP Port</label>
+        <input id="smtpPort" name="smtpPort" type="number" min="1" max="65535" placeholder="587" value="<%= smtpSettings.port || '' %>" />
+      </div>
+      <div>
+        <label for="smtpUser">SMTP Username</label>
+        <input id="smtpUser" name="smtpUser" placeholder="your-email@example.com" value="<%= smtpSettings.user %>" />
+      </div>
+      <div>
+        <label for="smtpPass">SMTP Password / App Password</label>
+        <input
+          id="smtpPass"
+          name="smtpPass"
+          type="password"
+          placeholder="<%= smtpSettings.pass ? 'Leave blank to keep current password' : 'Enter SMTP password' %>"
+        />
+      </div>
+      <div>
+        <label for="fromEmail">From Email</label>
+        <input id="fromEmail" name="fromEmail" type="email" placeholder="your-email@example.com" value="<%= smtpSettings.fromEmail %>" />
+      </div>
+      <div>
+        <label for="fromName">From Name</label>
+        <input id="fromName" name="fromName" placeholder="Pre-loved by Lhota" value="<%= smtpSettings.fromName %>" />
+      </div>
+      <div>
+        <label for="smtpSecure">SMTP Secure (SSL/TLS)</label>
+        <select id="smtpSecure" name="smtpSecure">
+          <option value="" <%= smtpSettings.secure === null ? "selected" : "" %>>Use default (.env/port)</option>
+          <option value="true" <%= smtpSettings.secure === true ? "selected" : "" %>>Yes</option>
+          <option value="false" <%= smtpSettings.secure === false ? "selected" : "" %>>No</option>
+        </select>
+      </div>
+      <div>
+        <label for="smtpRejectUnauthorized">Require Valid TLS Certificate</label>
+        <select id="smtpRejectUnauthorized" name="smtpRejectUnauthorized">
+          <option value="" <%= smtpSettings.rejectUnauthorized === null ? "selected" : "" %>>Use default (.env)</option>
+          <option value="true" <%= smtpSettings.rejectUnauthorized === true ? "selected" : "" %>>Yes</option>
+          <option value="false" <%= smtpSettings.rejectUnauthorized === false ? "selected" : "" %>>No</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="smtp-settings-actions">
+      <button type="submit" class="button button-primary">Save SMTP Settings</button>
+    </div>
+  </form>
+
+  <form action="/admin/smtp/settings" method="POST" onsubmit="return confirm('Reset saved SMTP settings and fallback to .env values?');">
+    <input type="hidden" name="clearSaved" value="1" />
+    <button type="submit" class="button button-secondary">Reset Saved SMTP Settings</button>
+  </form>
+
+  <form action="/admin/smtp/test" method="POST">
+    <label for="smtpTestEmail">Send Test Email To</label>
+    <input
+      id="smtpTestEmail"
+      name="testEmail"
+      type="email"
+      placeholder="owner@example.com"
+      value="<%= adminNotifications.newOrderEmail %>"
+      required
+    />
+    <button type="submit" class="button button-primary">Send SMTP Test</button>
+  </form>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="email">
+  <h2>Order Notifications</h2>
+  <p class="muted">Set where new order emails should be sent for admin alerts.</p>
+
+  <form action="/admin/notifications/settings" method="POST">
+    <label class="inline-choice">
+      <input type="checkbox" name="enabled" value="1" <%= adminNotifications.enabled ? "checked" : "" %> />
+      <span>Enable Admin Order Notifications</span>
+    </label>
+
+    <label for="newOrderEmail">Notification Email Address</label>
+    <input
+      id="newOrderEmail"
+      name="newOrderEmail"
+      type="email"
+      value="<%= adminNotifications.newOrderEmail %>"
+      placeholder="owner@example.com"
+      <%= adminNotifications.enabled ? "required" : "" %>
+    />
+
+    <p class="muted">Orders pending for <%= pendingReminderHours %>+ hours trigger a one-time reminder email.</p>
+
+    <button type="submit" class="button button-primary">Save Notification Settings</button>
+  </form>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="inventory">
+  <h2>Item Inventory</h2>
+  <p class="muted">Create products, update stock/details, and block items from storefront checkout.</p>
+
+  <section class="card">
+    <h3>Add New Item</h3>
+    <form class="inventory-create-form" action="/admin/items/create" method="POST">
+      <div class="inventory-form-grid">
+        <div>
+          <label for="new-item-name">Name</label>
+          <input id="new-item-name" name="name" maxlength="120" required />
+        </div>
+        <div>
+          <label for="new-item-category">Category</label>
+          <select id="new-item-category" name="category" required>
+            <% inventoryCategories.forEach((category) => { %>
+              <option value="<%= category %>"><%= category %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label for="new-item-price">Price (PHP)</label>
+          <input id="new-item-price" name="price" type="number" min="0" step="0.01" required />
+        </div>
+        <div>
+          <label for="new-item-stock">Stock</label>
+          <input id="new-item-stock" name="stock" type="number" min="0" step="1" required />
+        </div>
+        <div class="inventory-grid-span">
+          <label for="new-item-image">Image URL</label>
+          <input id="new-item-image" name="imageUrl" type="url" placeholder="https://..." required />
+        </div>
+        <div class="inventory-grid-span">
+          <label for="new-item-description">Description</label>
+          <textarea id="new-item-description" name="description" rows="2" required></textarea>
+        </div>
+      </div>
+      <div class="inventory-actions">
+        <button type="submit" class="button button-primary">Add Item</button>
+      </div>
+    </form>
+  </section>
+
+  <h3>Existing Items (<%= inventoryItems.length %>)</h3>
+  <% if (inventoryItems.length === 0) { %>
+    <p class="muted">No items yet.</p>
+  <% } %>
+
+  <div class="inventory-list">
+    <% inventoryItems.forEach((item) => { %>
+      <article class="inventory-item-row <%= item.isBlocked ? 'is-blocked' : '' %>">
+        <div class="inventory-item-head">
+          <div>
+            <strong><%= item.id %> - <%= item.name %></strong>
+            <p class="muted"><%= item.category %> | <%= formatCurrency(item.price) %> | Stock: <%= item.stock %></p>
+          </div>
+          <div class="inventory-actions">
+            <span class="status <%= item.isBlocked ? 'needs-attention' : 'paid' %>"><%= item.isBlocked ? "Blocked" : "Active" %></span>
+            <form action="/admin/items/<%= encodeURIComponent(item.id) %>/block" method="POST">
+              <input type="hidden" name="blocked" value="<%= item.isBlocked ? '0' : '1' %>" />
+              <button type="submit" class="button <%= item.isBlocked ? 'button-secondary' : 'button-danger' %>">
+                <%= item.isBlocked ? "Unblock" : "Block" %>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <form class="inventory-edit-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/inventory" method="POST">
+          <div class="inventory-form-grid">
+            <div>
+              <label for="inv-name-<%= item.id %>">Name</label>
+              <input id="inv-name-<%= item.id %>" name="name" maxlength="120" value="<%= item.name %>" required />
+            </div>
+            <div>
+              <label for="inv-category-<%= item.id %>">Category</label>
+              <select id="inv-category-<%= item.id %>" name="category" required>
+                <% inventoryCategories.forEach((category) => { %>
+                  <option value="<%= category %>" <%= item.category === category ? "selected" : "" %>><%= category %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label for="inv-price-<%= item.id %>">Price (PHP)</label>
+              <input id="inv-price-<%= item.id %>" name="price" type="number" min="0" step="0.01" value="<%= item.price %>" required />
+            </div>
+            <div>
+              <label for="inv-stock-<%= item.id %>">Stock</label>
+              <input id="inv-stock-<%= item.id %>" name="stock" type="number" min="0" step="1" value="<%= item.stock %>" required />
+            </div>
+            <div class="inventory-grid-span">
+              <label for="inv-image-<%= item.id %>">Image URL</label>
+              <input id="inv-image-<%= item.id %>" name="imageUrl" type="url" value="<%= item.imageUrl %>" required />
+            </div>
+            <div class="inventory-grid-span">
+              <label for="inv-description-<%= item.id %>">Description</label>
+              <textarea id="inv-description-<%= item.id %>" name="description" rows="2" required><%= item.description %></textarea>
+            </div>
+          </div>
+          <div class="inventory-actions">
+            <button type="submit" class="button button-primary">Save Inventory</button>
+          </div>
+        </form>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="orders">
+  <h2>Pending Orders (<%= pendingOrders.length %>)</h2>
+
+  <% if (pendingOrders.length === 0) { %>
+    <p class="muted">No pending orders.</p>
+  <% } %>
+
+  <% pendingOrders.forEach((order) => { %>
+    <% const ageHours = Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60))); %>
+    <% const isStale = ageHours >= pendingReminderHours; %>
+    <article class="order-card">
+      <div class="order-top">
+        <h3>Order #<%= order.id %></h3>
+        <div class="status-list">
+          <span class="status pending">Pending</span>
+          <% if (isStale) { %>
+            <span class="status needs-attention">Not Processed</span>
+          <% } %>
+        </div>
+      </div>
+      <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %> | <%= order.buyerPhone %></p>
+      <p><strong>Checkout Type:</strong> <%= order.checkoutMode === "CREATE_ACCOUNT" ? "Account" : "Guest" %></p>
+      <p><strong>Address:</strong> <%= order.deliveryAddress %></p>
+      <p><strong>Location:</strong> <%= [order.deliveryBarangay, order.deliveryCity, order.deliveryRegion].filter(Boolean).join(", ") || "-" %></p>
+      <p><strong>Delivery Area:</strong> <%= formatDeliveryArea(order.deliveryArea) %></p>
+      <p><strong>Delivery Fee:</strong> <%= formatCurrency(order.deliveryFee || 0) %></p>
+      <p><strong>Payment Number:</strong> <%= order.gcashNumber || "-" %></p>
+      <p><strong>Payment Reference:</strong> <%= order.gcashReference || "-" %></p>
+      <p><strong>Created:</strong> <%= formatDate(order.createdAt) %></p>
+      <p><strong>Pending Age:</strong> <%= ageHours %> hour(s)</p>
+      <p><strong>Reminder Email:</strong> <%= order.pendingReminderNotifiedAt ? formatDate(order.pendingReminderNotifiedAt) : (isStale ? "Due / waiting for next scan" : "Not due yet") %></p>
+      <p><strong>Items Subtotal:</strong> <%= formatCurrency(order.itemSubtotal || order.totalAmount) %></p>
+      <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+      <p>
+        <strong>Payment Proof:</strong>
+        <a href="<%= order.paymentProofPath %>" target="_blank" rel="noopener noreferrer">View screenshot</a>
+      </p>
+
+      <ul class="order-items">
+        <% order.items.forEach((item) => { %>
+          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+        <% }) %>
+      </ul>
+
+      <div class="order-actions">
+        <form action="/admin/orders/<%= order.id %>/status" method="POST">
+          <input type="hidden" name="nextStatus" value="PAID" />
+          <button type="submit" class="button button-primary">Mark as Paid</button>
+        </form>
+        <form action="/admin/orders/<%= order.id %>/archive" method="POST">
+          <button type="submit" class="button button-secondary">Archive</button>
+        </form>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="orders">
+  <h2>Paid Orders (<%= paidOrders.length %>)</h2>
+
+  <% if (paidOrders.length === 0) { %>
+    <p class="muted">No paid orders yet.</p>
+  <% } %>
+
+  <% paidOrders.forEach((order) => { %>
+    <article class="order-card">
+      <div class="order-top">
+        <h3>Order #<%= order.id %></h3>
+        <span class="status paid">Paid</span>
+      </div>
+      <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %></p>
+      <p><strong>Checkout Type:</strong> <%= order.checkoutMode === "CREATE_ACCOUNT" ? "Account" : "Guest" %></p>
+      <p><strong>Paid At:</strong> <%= order.paidAt ? formatDate(order.paidAt) : "-" %></p>
+      <p><strong>Buyer Email Notification:</strong> <%= order.emailNotifiedAt ? formatDate(order.emailNotifiedAt) : "Not sent" %></p>
+      <p><strong>Delivery Area:</strong> <%= formatDeliveryArea(order.deliveryArea) %></p>
+      <p><strong>Delivery Fee:</strong> <%= formatCurrency(order.deliveryFee || 0) %></p>
+      <p><strong>Items Subtotal:</strong> <%= formatCurrency(order.itemSubtotal || order.totalAmount) %></p>
+      <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+
+      <ul class="order-items">
+        <% order.items.forEach((item) => { %>
+          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+        <% }) %>
+      </ul>
+
+      <div class="order-actions">
+        <form action="/admin/orders/<%= order.id %>/status" method="POST">
+          <input type="hidden" name="nextStatus" value="FOR_DELIVERY" />
+          <button type="submit" class="button button-primary">Mark for Delivery</button>
+        </form>
+        <form action="/admin/orders/<%= order.id %>/archive" method="POST">
+          <button type="submit" class="button button-secondary">Archive</button>
+        </form>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="orders">
+  <h2>For Delivery Orders (<%= forDeliveryOrders.length %>)</h2>
+
+  <% if (forDeliveryOrders.length === 0) { %>
+    <p class="muted">No orders marked for delivery.</p>
+  <% } %>
+
+  <% forDeliveryOrders.forEach((order) => { %>
+    <article class="order-card">
+      <div class="order-top">
+        <h3>Order #<%= order.id %></h3>
+        <span class="status for-delivery">For Delivery</span>
+      </div>
+      <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %></p>
+      <p><strong>For Delivery At:</strong> <%= order.forDeliveryAt ? formatDate(order.forDeliveryAt) : "-" %></p>
+      <p><strong>Address:</strong> <%= order.deliveryAddress %></p>
+      <p><strong>Location:</strong> <%= [order.deliveryBarangay, order.deliveryCity, order.deliveryRegion].filter(Boolean).join(", ") || "-" %></p>
+      <p><strong>Delivery Area:</strong> <%= formatDeliveryArea(order.deliveryArea) %></p>
+      <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+
+      <ul class="order-items">
+        <% order.items.forEach((item) => { %>
+          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+        <% }) %>
+      </ul>
+
+      <div class="order-actions">
+        <form action="/admin/orders/<%= order.id %>/status" method="POST">
+          <input type="hidden" name="nextStatus" value="RECEIVED" />
+          <button type="submit" class="button button-primary">Mark as Received</button>
+        </form>
+        <form action="/admin/orders/<%= order.id %>/archive" method="POST">
+          <button type="submit" class="button button-secondary">Archive</button>
+        </form>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="orders">
+  <h2>Received Orders (<%= receivedOrders.length %>)</h2>
+
+  <% if (receivedOrders.length === 0) { %>
+    <p class="muted">No received orders yet.</p>
+  <% } %>
+
+  <% receivedOrders.forEach((order) => { %>
+    <article class="order-card">
+      <div class="order-top">
+        <h3>Order #<%= order.id %></h3>
+        <span class="status received">Received</span>
+      </div>
+      <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %></p>
+      <p><strong>Received At:</strong> <%= order.receivedAt ? formatDate(order.receivedAt) : "-" %></p>
+      <p><strong>Delivery Area:</strong> <%= formatDeliveryArea(order.deliveryArea) %></p>
+      <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+      <div class="order-actions">
+        <form action="/admin/orders/<%= order.id %>/archive" method="POST">
+          <button type="submit" class="button button-secondary">Archive</button>
+        </form>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="archived">
+  <h2>Archived Orders (<%= archivedOrders.length %>)</h2>
+
+  <% if (archivedOrders.length === 0) { %>
+    <p class="muted">No archived orders yet.</p>
+  <% } %>
+
+  <% archivedOrders.forEach((order) => { %>
+    <article class="order-card">
+      <div class="order-top">
+        <h3>Order #<%= order.id %></h3>
+        <div class="status-list">
+          <span class="status archived">Archived</span>
+          <span class="status"><%= String(order.status || "").replace(/_/g, " ") %></span>
+        </div>
+      </div>
+      <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %></p>
+      <p><strong>Archived At:</strong> <%= order.archivedAt ? formatDate(order.archivedAt) : "-" %></p>
+      <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+      <p><strong>Items:</strong> <%= order.items.map((item) => `${item.name} x${item.quantity}`).join(", ") %></p>
+      <div class="order-actions">
+        <form action="/admin/orders/<%= order.id %>/unarchive" method="POST">
+          <button type="submit" class="button button-secondary">Unarchive</button>
+        </form>
+        <form action="/admin/orders/<%= order.id %>/delete" method="POST" onsubmit="return confirm('Delete this order permanently? This cannot be undone.');">
+          <button type="submit" class="button button-danger">Delete Permanently</button>
+        </form>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="facebook">
+  <h2>Facebook Auto-Post Cron</h2>
+  <p class="muted">Post random in-stock items daily to your Facebook Page feed.</p>
+
+  <form class="facebook-post-form" action="/admin/facebook-autopost/settings" method="POST">
+    <div class="facebook-post-grid">
+      <label class="inline-choice">
+        <input type="checkbox" name="enabled" value="1" <%= facebookAutoPost.enabled ? "checked" : "" %> />
+        <span>Enable Auto-Posting</span>
+      </label>
+
+      <div>
+        <label for="pageId">Facebook Page ID</label>
+        <input id="pageId" name="pageId" value="<%= facebookAutoPost.pageId %>" placeholder="e.g. 1234567890" />
+      </div>
+
+      <div>
+        <label for="pageAccessToken">Page Access Token</label>
+        <input
+          id="pageAccessToken"
+          name="pageAccessToken"
+          type="password"
+          placeholder="<%= facebookAutoPost.pageAccessToken ? 'Leave blank to keep current token' : 'Paste Page access token' %>"
+        />
+        <p class="muted">Paste only the raw token value. Do not include <code>Bearer</code>, quotes, or extra spaces. Page tokens usually start with <code>EA</code>.</p>
+      </div>
+
+      <div>
+        <label for="baseUrl">Public Base URL</label>
+        <input id="baseUrl" name="baseUrl" value="<%= facebookAutoPost.baseUrl %>" placeholder="https://your-domain.com" />
+      </div>
+
+      <div>
+        <label for="postTime">Daily Post Time</label>
+        <input id="postTime" name="postTime" type="time" value="<%= facebookPostTime %>" />
+      </div>
+
+      <div>
+        <label for="timezone">Timezone</label>
+        <input id="timezone" name="timezone" value="<%= facebookAutoPost.timezone %>" />
+      </div>
+
+      <div>
+        <label for="itemsPerPost">Items Per Post</label>
+        <input
+          id="itemsPerPost"
+          name="itemsPerPost"
+          type="number"
+          min="1"
+          max="6"
+          value="<%= facebookAutoPost.itemsPerPost %>"
+        />
+      </div>
+    </div>
+
+    <div class="facebook-post-actions">
+      <button type="submit" class="button button-primary">Save Cron Settings</button>
+    </div>
+  </form>
+
+  <form action="/admin/facebook-autopost/run" method="POST">
+    <button type="submit" class="button">Post Random Items Now</button>
+  </form>
+
+  <div class="facebook-post-status">
+    <p><strong>Last Status:</strong> <%= facebookAutoPost.lastPostStatus || "IDLE" %></p>
+    <p><strong>Last Message:</strong> <%= facebookAutoPost.lastPostMessage || "-" %></p>
+    <p><strong>Last Post ID:</strong> <%= facebookAutoPost.lastPostId || "-" %></p>
+    <p><strong>Last Posted:</strong> <%= facebookAutoPost.lastPostedAt ? formatDate(facebookAutoPost.lastPostedAt) : "-" %></p>
+    <p><strong>Last Attempt:</strong> <%= facebookAutoPost.lastAttemptAt ? formatDate(facebookAutoPost.lastAttemptAt) : "-" %></p>
+    <p><strong>Triggered By:</strong> <%= facebookAutoPost.lastTriggeredBy || "-" %></p>
+  </div>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="links">
+  <h2>Direct Purchase Links</h2>
+  <p class="muted">Share these URLs on Facebook so buyers can open checkout with one item preloaded.</p>
+
+  <% const checkoutStep = Number(paymongoCheckout && paymongoCheckout.step) || 50; %>
+
+  <section class="card">
+    <h3>Checkout PayMongo Links (Every PHP <%= checkoutStep %>)</h3>
+    <p class="muted">Buyer checkout will auto-show a link based on the grand total rounded up to the nearest step.</p>
+
+    <% const checkoutMaxAmount = 1000; %>
+    <% const checkoutAmounts = []; %>
+    <% for (let amount = checkoutStep; amount <= checkoutMaxAmount; amount += checkoutStep) { checkoutAmounts.push(amount); } %>
+
+    <form class="paymongo-bulk-form" action="/admin/paymongo/amount-links/bulk" method="POST">
+      <div class="paymongo-bulk-grid">
+        <% checkoutAmounts.forEach((amount) => { %>
+          <% const currentLink = String(((paymongoCheckout && paymongoCheckout.links) ? paymongoCheckout.links[String(amount)] : "") || "").trim(); %>
+          <div class="paymongo-bulk-row">
+            <label for="paymongo-amount-<%= amount %>">PHP <%= amount.toFixed(2) %></label>
+            <input
+              id="paymongo-amount-<%= amount %>"
+              name="amount_<%= amount %>"
+              type="url"
+              placeholder="https://checkout.paymongo.com/..."
+              value="<%= currentLink %>"
+            />
+            <% if (currentLink) { %>
+              <a class="button button-secondary" href="<%= currentLink %>" target="_blank" rel="noopener noreferrer">Open</a>
+            <% } else { %>
+              <span class="muted">No link</span>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+      <p class="muted">Leave a field blank to clear that amount link.</p>
+      <div class="paymongo-link-actions">
+        <button type="submit" class="button button-primary">Save All Links</button>
+      </div>
+    </form>
+  </section>
+
+  <% items.forEach((item) => { %>
+    <article class="direct-link-row" data-item-id="<%= item.id %>" data-max-stock="<%= item.stock %>">
+      <div class="direct-link-item-head">
+        <strong><%= item.name %></strong>
+        <p class="muted"><%= item.category %> | Stock: <%= item.stock %></p>
+
+        <form class="item-name-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/name" method="POST">
+          <label for="item-name-<%= item.id %>">Product Name</label>
+          <div class="item-name-actions">
+            <input
+              id="item-name-<%= item.id %>"
+              type="text"
+              name="name"
+              value="<%= item.name %>"
+              maxlength="120"
+              required
+            />
+            <button type="submit" class="button button-secondary">Save Name</button>
+          </div>
+        </form>
+
+        <form
+          class="ai-name-form"
+          action="/admin/items/<%= encodeURIComponent(item.id) %>/ai-name"
+          method="POST"
+          enctype="multipart/form-data"
+        >
+          <label for="ai-image-<%= item.id %>">AI Name from Uploaded Image</label>
+          <div class="ai-name-actions">
+            <input id="ai-image-<%= item.id %>" type="file" name="aiProductImage" accept="image/*" required />
+            <button type="submit" class="button button-primary">Generate + Save</button>
+          </div>
+          <p class="muted">Uses OpenAI Vision from your uploaded image.</p>
+        </form>
+      </div>
+      <div class="direct-link-controls">
+        <label class="direct-link-label" for="share-qty-<%= item.id %>">Qty</label>
+        <input
+          id="share-qty-<%= item.id %>"
+          class="direct-link-qty"
+          type="number"
+          min="1"
+          max="<%= item.stock > 0 ? item.stock : 1 %>"
+          value="1"
+          <%= item.stock < 1 ? "disabled" : "" %>
+        />
+        <input
+          class="direct-link-url"
+          type="text"
+          readonly
+          value="<%= `${baseUrl}/buy/${encodeURIComponent(item.id)}?qty=1` %>"
+        />
+        <button type="button" class="button copy-direct-link" <%= item.stock < 1 ? "disabled" : "" %>>
+          Copy URL
+        </button>
+      </div>
+
+      <form class="paymongo-link-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/paymongo-link" method="POST">
+        <label for="paymongo-link-<%= item.id %>">PayMongo Checkout Link</label>
+        <input
+          id="paymongo-link-<%= item.id %>"
+          name="paymongoLink"
+          type="url"
+          placeholder="https://checkout.paymongo.com/..."
+          value="<%= item.paymongoLink || '' %>"
+        />
+        <div class="paymongo-link-actions">
+          <button type="submit" class="button button-primary">Save PayMongo Link</button>
+          <% if (item.paymongoLink) { %>
+            <a class="button button-secondary" href="<%= item.paymongoLink %>" target="_blank" rel="noopener noreferrer">Open PayMongo</a>
+          <% } %>
+        </div>
+        <p class="muted">Waiting Page: <code><%= `${baseUrl}/payment/waiting/${encodeURIComponent(item.id)}` %></code></p>
+        <p class="muted">Callback URL: <code><%= `${baseUrl}/payment/callback?itemId=${encodeURIComponent(item.id)}` %></code></p>
+      </form>
+    </article>
+  <% }) %>
+</section>
+
+<script>
+  (function () {
+    const TAB_STORAGE_KEY = "preloved_admin_active_tab";
+    const allowedTabs = new Set(["orders", "email", "inventory", "facebook", "links", "archived"]);
+    const tabButtons = Array.from(document.querySelectorAll("[data-admin-tab-trigger]"));
+    const tabPanels = Array.from(document.querySelectorAll("[data-admin-tab]"));
+    const baseUrl = "<%= baseUrl %>";
+
+    function isValidTab(tab) {
+      return allowedTabs.has(tab);
+    }
+
+    function getTabFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const value = String(params.get("tab") || "").trim().toLowerCase();
+      return isValidTab(value) ? value : "";
+    }
+
+    function applyAdminTab(nextTab) {
+      if (!isValidTab(nextTab)) {
+        return;
+      }
+
+      tabPanels.forEach((panel) => {
+        const panelTab = panel.getAttribute("data-admin-tab");
+        panel.hidden = panelTab !== nextTab;
+      });
+
+      tabButtons.forEach((button) => {
+        const isActive = button.getAttribute("data-admin-tab-trigger") === nextTab;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+
+      try {
+        window.localStorage.setItem(TAB_STORAGE_KEY, nextTab);
+      } catch (_error) {
+        // Ignore storage failures.
+      }
+    }
+
+    if (tabButtons.length > 0 && tabPanels.length > 0) {
+      let storedTab = "";
+      try {
+        storedTab = String(window.localStorage.getItem(TAB_STORAGE_KEY) || "").trim().toLowerCase();
+      } catch (_error) {
+        storedTab = "";
+      }
+
+      const initialTab = getTabFromQuery() || (isValidTab(storedTab) ? storedTab : "orders");
+      applyAdminTab(initialTab);
+
+      tabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextTab = String(button.getAttribute("data-admin-tab-trigger") || "").trim().toLowerCase();
+          applyAdminTab(nextTab);
+        });
+      });
+    }
+
+    function buildUrl(itemId, qty) {
+      return `${baseUrl}/buy/${encodeURIComponent(itemId)}?qty=${qty}`;
+    }
+
+    document.querySelectorAll(".direct-link-row").forEach((row) => {
+      const itemId = row.getAttribute("data-item-id");
+      const maxStock = Number(row.getAttribute("data-max-stock")) || 1;
+      const qtyInput = row.querySelector(".direct-link-qty");
+      const urlInput = row.querySelector(".direct-link-url");
+      const copyButton = row.querySelector(".copy-direct-link");
+
+      if (!qtyInput || !urlInput) {
+        return;
+      }
+
+      function syncUrl() {
+        let qty = Number(qtyInput.value);
+        if (!Number.isInteger(qty) || qty < 1) {
+          qty = 1;
+        }
+        if (qty > maxStock && maxStock > 0) {
+          qty = maxStock;
+        }
+        qtyInput.value = String(qty);
+        urlInput.value = buildUrl(itemId, qty);
+      }
+
+      qtyInput.addEventListener("input", syncUrl);
+      syncUrl();
+
+      if (copyButton) {
+        copyButton.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(urlInput.value);
+            copyButton.textContent = "Copied";
+            setTimeout(() => {
+              copyButton.textContent = "Copy URL";
+            }, 1000);
+          } catch (_error) {
+            urlInput.select();
+            document.execCommand("copy");
+          }
+        });
+      }
+    });
+  })();
+</script>
+
+<%- include('partials/footer') %>
