@@ -58,6 +58,8 @@ const { postRandomItemsToFacebook } = require("./utils/facebookPoster");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
+const host = String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
+const publicHostLabel = host === "0.0.0.0" ? "localhost" : host;
 const UNPROCESSED_ORDER_REMINDER_HOURS = Number(process.env.UNPROCESSED_ORDER_REMINDER_HOURS) > 0
   ? Number(process.env.UNPROCESSED_ORDER_REMINDER_HOURS)
   : 24;
@@ -1591,6 +1593,6 @@ app.post("/admin/orders/:id/delete", requireAdmin, (req, res) => {
 rescheduleFacebookAutoPost();
 startPendingReminderCron();
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`Preloved app running at http://localhost:${port}`);
+app.listen(port, host, () => {
+  console.log(`Preloved app running at http://${publicHostLabel}:${port}`);
 });
