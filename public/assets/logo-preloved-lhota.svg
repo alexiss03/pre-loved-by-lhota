@@ -1,29 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="520" height="128" viewBox="0 0 520 128" fill="none" role="img" aria-labelledby="logoTitle logoDesc">
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="170" viewBox="0 0 520 170" fill="none" role="img" aria-labelledby="logoTitle logoDesc">
   <title id="logoTitle">Pre-loved by Lhota logo</title>
-  <desc id="logoDesc">Elegant red wordmark logo with a heart accent for Pre-loved by Lhota.</desc>
+  <desc id="logoDesc">Stacked blush logo for Pre-loved by Lhota inspired by editorial fashion typography.</desc>
 
   <defs>
-    <linearGradient id="heartFill" x1="244" y1="28" x2="304" y2="86" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f39ab7" />
-      <stop offset="1" stop-color="#e76b92" />
+    <linearGradient id="glitterPink" x1="82" y1="20" x2="410" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f0a7b6" />
+      <stop offset="0.45" stop-color="#d97e95" />
+      <stop offset="1" stop-color="#bf5e7a" />
     </linearGradient>
+    <filter id="softNoise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise" />
+      <feColorMatrix in="noise" type="saturate" values="0" result="monoNoise" />
+      <feComponentTransfer in="monoNoise" result="grain">
+        <feFuncA type="table" tableValues="0 0.08" />
+      </feComponentTransfer>
+      <feBlend in="SourceGraphic" in2="grain" mode="multiply" />
+    </filter>
   </defs>
 
-  <text x="16" y="38" fill="#b61d35" font-size="17" font-family="Arial, Helvetica, sans-serif" letter-spacing="3.8">
-    PRE-LOVED BY LHOTA
-  </text>
+  <g filter="url(#softNoise)">
+    <text x="88" y="66" fill="url(#glitterPink)" font-size="70" font-family="Arial, Helvetica, sans-serif" font-weight="800" letter-spacing="1.5">
+      PRE
+    </text>
+    <text x="18" y="124" fill="url(#glitterPink)" font-size="70" font-family="Arial, Helvetica, sans-serif" font-weight="800" letter-spacing="1.5">
+      LOVED
+    </text>
+  </g>
 
-  <text x="16" y="92" fill="#9f1328" font-size="66" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1.2">
-    PREL
-  </text>
-
-  <path d="M260 39c-8-12-26-12-34 0-9 14-3 31 10 42l24 21 24-21c13-11 19-28 10-42-8-12-26-12-34 0Z" fill="url(#heartFill)" />
-
-  <text x="299" y="92" fill="#9f1328" font-size="66" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1.2">
-    VED
-  </text>
-
-  <text x="17" y="114" fill="#7d5d54" font-size="19" font-family="Arial, Helvetica, sans-serif" letter-spacing="2.1">
-    curated preloved finds
+  <text x="180" y="156" fill="#8b6d6d" font-size="18" font-family="Arial, Helvetica, sans-serif" letter-spacing="2.6">
+    by Lhota
   </text>
 </svg>
