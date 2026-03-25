@@ -264,6 +264,24 @@ function inferMimeTypeFromFilename(filename) {
   return map[ext] || "";
 }
 
+function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "" }) {
+  if (file && file.filename) {
+    return `/uploads/${file.filename}`;
+  }
+
+  const typedImageUrl = String(imageUrl || "").trim();
+  if (typedImageUrl) {
+    return typedImageUrl;
+  }
+
+  const existingImageUrl = String(fallbackImageUrl || "").trim();
+  if (existingImageUrl) {
+    return existingImageUrl;
+  }
+
+  throw new Error("Please upload a photo or provide an image URL.");
+}
+
 function extractOutputTextFromResponsesApi(payload) {
   if (payload && typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -1372,7 +1390,7 @@ app.post("/admin/paymongo/amount-links/:amount/delete", requireAdmin, (req, res)
   }
 });
 
-app.post("/admin/items/create", requireAdmin, (req, res) => {
+app.post("/admin/items/create", requireAdmin, upload.single("productImage"), (req, res) => {
   try {
     const item = createItem({
       name: req.body.name,
@@ -1380,7 +1398,10 @@ app.post("/admin/items/create", requireAdmin, (req, res) => {
       price: req.body.price,
       stock: req.body.stock,
       description: req.body.description,
-      imageUrl: req.body.imageUrl,
+      imageUrl: resolveItemImageInput({
+        file: req.file,
+        imageUrl: req.body.imageUrl,
+      }),
       paymongoLink: req.body.paymongoLink,
     });
 
@@ -1396,7 +1417,7 @@ app.post("/admin/items/create", requireAdmin, (req, res) => {
   }
 });
 
-app.post("/admin/items/:id/inventory", requireAdmin, (req, res) => {
+app.post("/admin/items/:id/inventory", requireAdmin, upload.single("productImage"), (req, res) => {
   try {
     const itemId = String(req.params.id || "");
     const item = updateItemInventory(itemId, {
@@ -1405,7 +1426,11 @@ app.post("/admin/items/:id/inventory", requireAdmin, (req, res) => {
       price: req.body.price,
       stock: req.body.stock,
       description: req.body.description,
-      imageUrl: req.body.imageUrl,
+      imageUrl: resolveItemImageInput({
+        file: req.file,
+        imageUrl: req.body.imageUrl,
+        fallbackImageUrl: req.body.currentImageUrl,
+      }),
     });
 
     res.redirect(

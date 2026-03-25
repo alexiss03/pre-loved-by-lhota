@@ -149,7 +149,7 @@
 
   <section class="card">
     <h3>Add New Item</h3>
-    <form class="inventory-create-form" action="/admin/items/create" method="POST">
+    <form class="inventory-create-form" action="/admin/items/create" method="POST" enctype="multipart/form-data">
       <div class="inventory-form-grid">
         <div>
           <label for="new-item-name">Name</label>
@@ -173,7 +173,12 @@
         </div>
         <div class="inventory-grid-span">
           <label for="new-item-image">Image URL</label>
-          <input id="new-item-image" name="imageUrl" type="url" placeholder="https://..." required />
+          <input id="new-item-image" name="imageUrl" type="url" placeholder="https://..." />
+        </div>
+        <div class="inventory-grid-span">
+          <label for="new-item-photo">Upload Photo</label>
+          <input id="new-item-photo" name="productImage" type="file" accept="image/*" />
+          <p class="muted">Upload a photo or paste an image URL.</p>
         </div>
         <div class="inventory-grid-span">
           <label for="new-item-description">Description</label>
@@ -210,7 +215,7 @@
           </div>
         </div>
 
-        <form class="inventory-edit-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/inventory" method="POST">
+        <form class="inventory-edit-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/inventory" method="POST" enctype="multipart/form-data">
           <div class="inventory-form-grid">
             <div>
               <label for="inv-name-<%= item.id %>">Name</label>
@@ -234,7 +239,13 @@
             </div>
             <div class="inventory-grid-span">
               <label for="inv-image-<%= item.id %>">Image URL</label>
-              <input id="inv-image-<%= item.id %>" name="imageUrl" type="url" value="<%= item.imageUrl %>" required />
+              <input id="inv-image-<%= item.id %>" name="imageUrl" type="url" value="<%= item.imageUrl %>" />
+              <input name="currentImageUrl" type="hidden" value="<%= item.imageUrl %>" />
+            </div>
+            <div class="inventory-grid-span">
+              <label for="inv-photo-<%= item.id %>">Upload New Photo</label>
+              <input id="inv-photo-<%= item.id %>" name="productImage" type="file" accept="image/*" />
+              <p class="muted">Leave blank to keep the current photo.</p>
             </div>
             <div class="inventory-grid-span">
               <label for="inv-description-<%= item.id %>">Description</label>
