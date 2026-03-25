@@ -21,6 +21,9 @@
   <button type="button" class="admin-tab-button is-active" data-admin-tab-trigger="orders" role="tab" aria-selected="true">
     Orders
   </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="analytics" role="tab" aria-selected="false">
+    Analytics
+  </button>
   <button type="button" class="admin-tab-button" data-admin-tab-trigger="email" role="tab" aria-selected="false">
     Email
   </button>
@@ -37,6 +40,144 @@
     Archived
   </button>
 </nav>
+
+<section class="card admin-tab-panel" data-admin-tab="analytics">
+  <h2>Analytics</h2>
+  <p class="muted">Quick view of sales, order activity, and stock health.</p>
+
+  <div class="analytics-grid">
+    <article class="card analytics-card">
+      <span class="analytics-label">Revenue</span>
+      <strong><%= formatCurrency(analytics.totalRevenue) %></strong>
+      <p class="muted">From paid, for delivery, and received orders.</p>
+    </article>
+    <article class="card analytics-card">
+      <span class="analytics-label">Units Sold</span>
+      <strong><%= analytics.totalUnitsSold %></strong>
+      <p class="muted">Total pieces sold across fulfilled sales.</p>
+    </article>
+    <article class="card analytics-card">
+      <span class="analytics-label">Order Count</span>
+      <strong><%= analytics.orderCount %></strong>
+      <p class="muted"><%= analytics.statusCounts.pending %> pending right now.</p>
+    </article>
+    <article class="card analytics-card">
+      <span class="analytics-label">Active Items</span>
+      <strong><%= analytics.activeItemCount %></strong>
+      <p class="muted"><%= analytics.blockedItemCount %> blocked item(s).</p>
+    </article>
+  </div>
+
+  <div class="analytics-grid analytics-grid-secondary">
+    <section class="card analytics-panel">
+      <h3>Status Breakdown</h3>
+      <div class="analytics-list">
+        <div class="analytics-row">
+          <span>Pending</span>
+          <strong><%= analytics.statusCounts.pending %></strong>
+        </div>
+        <div class="analytics-row">
+          <span>Paid</span>
+          <strong><%= analytics.statusCounts.paid %></strong>
+        </div>
+        <div class="analytics-row">
+          <span>For Delivery</span>
+          <strong><%= analytics.statusCounts.forDelivery %></strong>
+        </div>
+        <div class="analytics-row">
+          <span>Received</span>
+          <strong><%= analytics.statusCounts.received %></strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="card analytics-panel">
+      <h3>Sales Mix</h3>
+      <div class="analytics-list">
+        <div class="analytics-row">
+          <span>Item Sales</span>
+          <strong><%= formatCurrency(analytics.totalItemSales) %></strong>
+        </div>
+        <div class="analytics-row">
+          <span>Delivery Fees</span>
+          <strong><%= formatCurrency(analytics.totalDeliveryFees) %></strong>
+        </div>
+        <div class="analytics-row">
+          <span>Total Catalog Items</span>
+          <strong><%= analytics.itemCount %></strong>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="analytics-grid analytics-grid-secondary">
+    <section class="card analytics-panel">
+      <h3>Top Categories</h3>
+      <% if (analytics.topCategories.length === 0) { %>
+        <p class="muted">No sales yet.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.topCategories.forEach((entry) => { %>
+            <div class="analytics-row">
+              <span><%= entry.name %> (<%= entry.units %> pcs)</span>
+              <strong><%= formatCurrency(entry.revenue) %></strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="card analytics-panel">
+      <h3>Top Items</h3>
+      <% if (analytics.topItems.length === 0) { %>
+        <p class="muted">No item sales yet.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.topItems.forEach((entry) => { %>
+            <div class="analytics-row">
+              <span><%= entry.name %> (<%= entry.units %> pcs)</span>
+              <strong><%= formatCurrency(entry.revenue) %></strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="analytics-grid analytics-grid-secondary">
+    <section class="card analytics-panel">
+      <h3>Low Stock</h3>
+      <% if (analytics.lowStockItems.length === 0) { %>
+        <p class="muted">No low-stock items.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.lowStockItems.forEach((item) => { %>
+            <div class="analytics-row">
+              <span><%= item.name %></span>
+              <strong><%= item.stock %> left</strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="card analytics-panel">
+      <h3>Latest Orders</h3>
+      <% if (analytics.latestOrders.length === 0) { %>
+        <p class="muted">No orders yet.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.latestOrders.forEach((order) => { %>
+            <div class="analytics-row">
+              <span>#<%= order.id %> - <%= order.buyerName %></span>
+              <strong><%= formatCurrency(order.grandTotal || order.totalAmount || 0) %></strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</section>
 
 <section class="card admin-tab-panel" data-admin-tab="email">
   <h2>SMTP Email Settings</h2>
@@ -654,7 +795,7 @@
 <script>
   (function () {
     const TAB_STORAGE_KEY = "preloved_admin_active_tab";
-    const allowedTabs = new Set(["orders", "email", "inventory", "facebook", "links", "archived"]);
+    const allowedTabs = new Set(["orders", "analytics", "email", "inventory", "facebook", "links", "archived"]);
     const tabButtons = Array.from(document.querySelectorAll("[data-admin-tab-trigger]"));
     const tabPanels = Array.from(document.querySelectorAll("[data-admin-tab]"));
     const baseUrl = "<%= baseUrl %>";

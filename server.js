@@ -282,6 +282,89 @@ function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "" }) {
   throw new Error("Please upload a photo or provide an image URL.");
 }
 
+function buildAdminAnalytics({ orders, items }) {
+  const activeOrders = orders.filter((order) => !order.isArchived);
+  const revenueOrders = activeOrders.filter((order) => {
+    const status = String(order.status || "").toUpperCase();
+    return status === ORDER_STATUSES.PAID ||
+      status === ORDER_STATUSES.FOR_DELIVERY ||
+      status === ORDER_STATUSES.RECEIVED;
+  });
+
+  const totalRevenue = revenueOrders.reduce((sum, order) => sum + Number(order.grandTotal || order.totalAmount || 0), 0);
+  const totalDeliveryFees = revenueOrders.reduce((sum, order) => sum + Number(order.deliveryFee || 0), 0);
+  const totalItemSales = revenueOrders.reduce((sum, order) => sum + Number(order.itemSubtotal || 0), 0);
+  const totalUnitsSold = revenueOrders.reduce(
+    (sum, order) => sum + (Array.isArray(order.items) ? order.items.reduce((itemSum, item) => itemSum + (Number(item.quantity) || 0), 0) : 0),
+    0
+  );
+
+  const statusCounts = {
+    pending: activeOrders.filter((order) => order.status === ORDER_STATUSES.PENDING).length,
+    paid: activeOrders.filter((order) => order.status === ORDER_STATUSES.PAID).length,
+    forDelivery: activeOrders.filter((order) => order.status === ORDER_STATUSES.FOR_DELIVERY).length,
+    received: activeOrders.filter((order) => order.status === ORDER_STATUSES.RECEIVED).length,
+  };
+
+  const categoryMap = new Map();
+  const itemMap = new Map();
+  for (const order of revenueOrders) {
+    for (const orderItem of order.items || []) {
+      const quantity = Number(orderItem.quantity) || 0;
+      const subtotal = Number(orderItem.subtotal) || 0;
+      const categoryKey = String(orderItem.category || "Other");
+      const itemKey = String(orderItem.itemId || orderItem.name || "");
+
+      const categoryEntry = categoryMap.get(categoryKey) || { name: categoryKey, units: 0, revenue: 0 };
+      categoryEntry.units += quantity;
+      categoryEntry.revenue += subtotal;
+      categoryMap.set(categoryKey, categoryEntry);
+
+      const itemEntry = itemMap.get(itemKey) || {
+        id: String(orderItem.itemId || ""),
+        name: String(orderItem.name || "Unknown item"),
+        units: 0,
+        revenue: 0,
+      };
+      itemEntry.units += quantity;
+      itemEntry.revenue += subtotal;
+      itemMap.set(itemKey, itemEntry);
+    }
+  }
+
+  const topCategories = [...categoryMap.values()]
+    .sort((a, b) => b.revenue - a.revenue || b.units - a.units || a.name.localeCompare(b.name))
+    .slice(0, 3);
+
+  const topItems = [...itemMap.values()]
+    .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name))
+    .slice(0, 5);
+
+  const lowStockItems = [...items]
+    .filter((item) => !item.isBlocked && Number(item.stock) <= 2)
+    .sort((a, b) => Number(a.stock) - Number(b.stock) || a.name.localeCompare(b.name));
+
+  const latestOrders = [...activeOrders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  return {
+    totalRevenue,
+    totalDeliveryFees,
+    totalItemSales,
+    totalUnitsSold,
+    orderCount: activeOrders.length,
+    itemCount: items.length,
+    activeItemCount: items.filter((item) => !item.isBlocked).length,
+    blockedItemCount: items.filter((item) => item.isBlocked).length,
+    lowStockItems,
+    latestOrders,
+    topCategories,
+    topItems,
+    statusCounts,
+  };
+}
+
 function extractOutputTextFromResponsesApi(payload) {
   if (payload && typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -1103,6 +1186,7 @@ app.post("/admin/logout", (req, res) => {
 app.get("/admin/orders", requireAdmin, async (req, res) => {
   const orders = getOrders();
   const items = getItems();
+  const analytics = buildAdminAnalytics({ orders, items });
   const inventoryItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
   const paymongoCheckout = getPaymongoCheckoutLinks();
   const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
@@ -1128,6 +1212,7 @@ app.get("/admin/orders", requireAdmin, async (req, res) => {
     items,
     inventoryItems,
     inventoryCategories: Object.values(ITEM_CATEGORIES),
+    analytics,
     paymongoCheckout,
     baseUrl,
     adminNotifications,

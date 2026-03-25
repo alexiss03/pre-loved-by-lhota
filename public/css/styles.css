@@ -995,6 +995,67 @@ input.piece-input {
   padding-top: 0.7rem;
 }
 
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.analytics-grid-secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-card,
+.analytics-panel {
+  background: #fbf6f0;
+  border: 1px solid #e4d8cb;
+}
+
+.analytics-card strong,
+.analytics-panel strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.4rem;
+  font-family: "Playfair Display", Georgia, serif;
+  color: #2f2925;
+}
+
+.analytics-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7c6b62;
+}
+
+.analytics-panel h3 {
+  margin-top: 0;
+}
+
+.analytics-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.analytics-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px dashed #dfd1c4;
+}
+
+.analytics-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.analytics-row span {
+  color: #5f5550;
+}
+
 .paymongo-link-form {
   margin-top: 0.8rem;
   border-top: 1px dashed #dccdbf;
@@ -1663,6 +1724,11 @@ code {
   .inventory-item-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .analytics-grid,
+  .analytics-grid-secondary {
+    grid-template-columns: 1fr;
   }
 
   .direct-link-controls .button {
