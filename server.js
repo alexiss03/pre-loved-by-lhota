@@ -142,8 +142,8 @@ app.locals.formatDeliveryArea = (value) => {
 
 function getAdminCredentials() {
   return {
-    email: process.env.ADMIN_EMAIL || "admin@preloved.local",
-    password: process.env.ADMIN_PASSWORD || "Admin1234!",
+    email: process.env.ADMIN_EMAIL || "admin@prelovedbylhota.com",
+    password: process.env.ADMIN_PASSWORD || "LhotaAdmin2026!",
   };
 }
 
