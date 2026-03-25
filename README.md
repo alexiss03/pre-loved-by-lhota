@@ -53,6 +53,9 @@ Important env values:
 - `SESSION_SECRET`: session encryption secret
 - `STORAGE_PROVIDER`: `SQLITE` (default), `SUPABASE`, or `JSON`
 - `SUPABASE_URL`, plus one key: `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY`
+- `UPLOAD_STORAGE_PROVIDER`: `LOCAL` or `SUPABASE`
+- `SUPABASE_STORAGE_BUCKET`: required when uploads should persist in Supabase Storage
+- `ALLOW_LOCAL_STORAGE_IN_PRODUCTION`: keep `false` so production fails instead of silently using local container storage
 - `UNPROCESSED_ORDER_REMINDER_HOURS` (optional): default is `24`
 - `OPENAI_API_KEY` (optional): required for AI product-name generation in Admin
 - `OPENAI_MODEL` (optional): default `gpt-4.1-mini`
@@ -87,10 +90,11 @@ npm start
 
 ## Notes
 
-- Uploaded payment screenshots are stored in `public/uploads`.
+- Uploaded files can be stored locally (`public/uploads`) or in Supabase Storage.
 - Initial product data is auto-seeded when DB state does not exist yet.
 - Default database is SQLite (`data/store.sqlite`), which is free and does not require a paid DB service.
 - For free hosted DB, use Supabase with `STORAGE_PROVIDER=SUPABASE`.
+- In production, keep both database and uploads on Supabase so redeploys do not overwrite runtime data.
 - If SMTP is not configured, email sending is skipped safely.
 - Admin dashboard has an SMTP health card and **Send SMTP Test** action.
 - Facebook auto-post requires a valid Facebook **Page ID** and **Page access token** configured in Admin.
@@ -105,10 +109,14 @@ npm start
 3. In `.env`, set:
    - `STORAGE_PROVIDER=SUPABASE`
    - `SUPABASE_URL=...`
-   - `SUPABASE_SERVICE_ROLE_KEY=...` (or publishable/anon key)
+   - `SUPABASE_SERVICE_ROLE_KEY=...`
+   - `UPLOAD_STORAGE_PROVIDER=SUPABASE`
+   - `SUPABASE_STORAGE_BUCKET=...`
+   - `ALLOW_LOCAL_STORAGE_IN_PRODUCTION=false`
 4. Restart the app.
 
 The app will migrate current local snapshot data into Supabase automatically when remote state is empty.
+For persistent uploads, create a public Storage bucket in Supabase and use that bucket name in `SUPABASE_STORAGE_BUCKET`.
 
 ## Admin Login
 

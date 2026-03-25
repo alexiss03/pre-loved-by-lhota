@@ -8,6 +8,7 @@ const fs = require("fs");
 const cron = require("node-cron");
 
 const {
+  ACTIVE_STORAGE_PROVIDER,
   DELIVERY_FEES,
   CHECKOUT_MODES,
   ORDER_STATUSES,
@@ -60,30 +61,151 @@ const app = express();
 const port = Number(process.env.PORT) || 3000;
 const host = String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
 const publicHostLabel = host === "0.0.0.0" ? "localhost" : host;
+const UPLOAD_STORAGE_PROVIDERS = Object.freeze({
+  LOCAL: "LOCAL",
+  SUPABASE: "SUPABASE",
+});
+const requestedUploadStorageProvider = String(
+  process.env.UPLOAD_STORAGE_PROVIDER || (ACTIVE_STORAGE_PROVIDER === "SUPABASE" ? "SUPABASE" : "LOCAL")
+)
+  .trim()
+  .toUpperCase();
+const ACTIVE_UPLOAD_STORAGE_PROVIDER = Object.values(UPLOAD_STORAGE_PROVIDERS).includes(requestedUploadStorageProvider)
+  ? requestedUploadStorageProvider
+  : UPLOAD_STORAGE_PROVIDERS.LOCAL;
 const UNPROCESSED_ORDER_REMINDER_HOURS = Number(process.env.UNPROCESSED_ORDER_REMINDER_HOURS) > 0
   ? Number(process.env.UNPROCESSED_ORDER_REMINDER_HOURS)
   : 24;
 
-ensureDataFile();
-
 const uploadsDir = path.join(__dirname, "public", "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+
+function isTruthyEnv(value) {
+  return /^(1|true|yes|on)$/i.test(String(value || "").trim());
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, callback) => {
-    callback(null, uploadsDir);
-  },
-  filename: (_req, file, callback) => {
-    const extension = path.extname(file.originalname);
-    const safeExt = extension || ".jpg";
-    callback(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
-  },
-});
+function ensureLocalUploadsDir(subdirectory = "") {
+  const targetDir = path.join(uploadsDir, subdirectory);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+  return targetDir;
+}
+
+function getSupabaseApiConfigOrThrow() {
+  const url = String(process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  const apiKey = [
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.SUPABASE_ANON_KEY,
+    process.env.SUPABASE_KEY,
+  ]
+    .map((value) => String(value || "").trim())
+    .find(Boolean);
+
+  if (!url || !apiKey) {
+    throw new Error("Supabase URL and API key are required for persistent storage.");
+  }
+
+  return { url, apiKey };
+}
+
+function getSupabaseStorageConfigOrThrow() {
+  const { url, apiKey } = getSupabaseApiConfigOrThrow();
+  const bucket = String(process.env.SUPABASE_STORAGE_BUCKET || "").trim();
+
+  if (!bucket) {
+    throw new Error("SUPABASE_STORAGE_BUCKET is required for persistent file uploads.");
+  }
+
+  return { url, apiKey, bucket };
+}
+
+function ensurePersistentStorageConfig() {
+  const requirePersistentStorage = process.env.NODE_ENV === "production" &&
+    !isTruthyEnv(process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION);
+
+  if (!requirePersistentStorage) {
+    return;
+  }
+
+  if (ACTIVE_STORAGE_PROVIDER !== "SUPABASE") {
+    throw new Error(
+      "Production requires STORAGE_PROVIDER=SUPABASE. Local SQLite storage will be overwritten on redeploy."
+    );
+  }
+
+  if (ACTIVE_UPLOAD_STORAGE_PROVIDER !== "SUPABASE") {
+    throw new Error(
+      "Production requires UPLOAD_STORAGE_PROVIDER=SUPABASE so uploaded files persist across redeploys."
+    );
+  }
+
+  getSupabaseStorageConfigOrThrow();
+}
+
+function buildStoredUploadName(file) {
+  const extension = path.extname(String((file && file.originalname) || "")).toLowerCase() || ".bin";
+  const safeExtension = extension.replace(/[^a-z0-9.]/gi, "") || ".bin";
+  return `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
+}
+
+function buildSupabasePublicObjectUrl(baseUrl, bucket, objectPath) {
+  const encodedPath = objectPath
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${baseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodedPath}`;
+}
+
+async function storeUploadedFile({ file, folder }) {
+  if (!file || !file.buffer) {
+    throw new Error("Uploaded file buffer is missing.");
+  }
+
+  const safeFolder = String(folder || "general").trim().replace(/[^a-z0-9/_-]/gi, "") || "general";
+  const filename = buildStoredUploadName(file);
+  const objectPath = `${safeFolder}/${filename}`;
+
+  if (ACTIVE_UPLOAD_STORAGE_PROVIDER === UPLOAD_STORAGE_PROVIDERS.SUPABASE) {
+    const { url, apiKey, bucket } = getSupabaseStorageConfigOrThrow();
+    const response = await fetch(
+      `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${objectPath.split("/").map((segment) => encodeURIComponent(segment)).join("/")}`,
+      {
+        method: "POST",
+        headers: {
+          apikey: apiKey,
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": String(file.mimetype || "application/octet-stream"),
+          "x-upsert": "true",
+        },
+        body: file.buffer,
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Supabase upload failed (${response.status}): ${String(errorText || "").slice(0, 180)}`);
+    }
+
+    return buildSupabasePublicObjectUrl(url, bucket, objectPath);
+  }
+
+  const targetDir = ensureLocalUploadsDir(safeFolder);
+  const localPath = path.join(targetDir, filename);
+  fs.writeFileSync(localPath, file.buffer);
+  return `/uploads/${objectPath}`;
+}
+
+ensurePersistentStorageConfig();
+ensureDataFile();
+
+if (ACTIVE_UPLOAD_STORAGE_PROVIDER === UPLOAD_STORAGE_PROVIDERS.LOCAL) {
+  ensureLocalUploadsDir();
+}
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
@@ -264,9 +386,9 @@ function inferMimeTypeFromFilename(filename) {
   return map[ext] || "";
 }
 
-function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "" }) {
-  if (file && file.filename) {
-    return `/uploads/${file.filename}`;
+async function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "" }) {
+  if (file) {
+    return storeUploadedFile({ file, folder: "items" });
   }
 
   const typedImageUrl = String(imageUrl || "").trim();
@@ -408,17 +530,21 @@ async function suggestProductNameFromImage(payload) {
     throw new Error("OPENAI_API_KEY is missing. Add it in .env to use AI name generation.");
   }
 
+  const imageBase64FromPayload = String((payload && payload.imageBase64) || "").trim();
   const imagePath = String((payload && payload.imagePath) || "").trim();
-  if (!imagePath || !fs.existsSync(imagePath)) {
-    throw new Error("Uploaded image file was not found.");
-  }
-
   const mimeType = String((payload && payload.mimeType) || "").trim() || inferMimeTypeFromFilename(imagePath);
   if (!mimeType.startsWith("image/")) {
     throw new Error("Uploaded file must be a valid image.");
   }
 
-  const imageBase64 = fs.readFileSync(imagePath, "base64");
+  let imageBase64 = imageBase64FromPayload;
+  if (!imageBase64) {
+    if (!imagePath || !fs.existsSync(imagePath)) {
+      throw new Error("Uploaded image file was not found.");
+    }
+    imageBase64 = fs.readFileSync(imagePath, "base64");
+  }
+
   const model = String(process.env.OPENAI_MODEL || "gpt-4.1-mini").trim();
   const apiBase = String(process.env.OPENAI_API_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
 
@@ -1100,6 +1226,11 @@ app.post("/checkout", upload.single("paymentProof"), async (req, res) => {
     const existingBuyer = getBuyerPublicById(req.session && req.session.buyerUserId);
     const buyerAccountId = createdAccount ? createdAccount.id : existingBuyer ? existingBuyer.id : null;
 
+    const paymentProofPath = await storeUploadedFile({
+      file: req.file,
+      folder: "payments",
+    });
+
     const order = createOrder({
       buyerName,
       buyerEmail,
@@ -1117,7 +1248,7 @@ app.post("/checkout", upload.single("paymentProof"), async (req, res) => {
       gcashReference,
       checkoutMode: normalizedCheckoutMode,
       buyerAccountId,
-      paymentProofPath: `/uploads/${req.file.filename}`,
+      paymentProofPath,
       items: sanitizedItems,
     });
 
@@ -1475,7 +1606,7 @@ app.post("/admin/paymongo/amount-links/:amount/delete", requireAdmin, (req, res)
   }
 });
 
-app.post("/admin/items/create", requireAdmin, upload.single("productImage"), (req, res) => {
+app.post("/admin/items/create", requireAdmin, upload.single("productImage"), async (req, res) => {
   try {
     const item = createItem({
       name: req.body.name,
@@ -1483,7 +1614,7 @@ app.post("/admin/items/create", requireAdmin, upload.single("productImage"), (re
       price: req.body.price,
       stock: req.body.stock,
       description: req.body.description,
-      imageUrl: resolveItemImageInput({
+      imageUrl: await resolveItemImageInput({
         file: req.file,
         imageUrl: req.body.imageUrl,
       }),
@@ -1502,7 +1633,7 @@ app.post("/admin/items/create", requireAdmin, upload.single("productImage"), (re
   }
 });
 
-app.post("/admin/items/:id/inventory", requireAdmin, upload.single("productImage"), (req, res) => {
+app.post("/admin/items/:id/inventory", requireAdmin, upload.single("productImage"), async (req, res) => {
   try {
     const itemId = String(req.params.id || "");
     const item = updateItemInventory(itemId, {
@@ -1511,7 +1642,7 @@ app.post("/admin/items/:id/inventory", requireAdmin, upload.single("productImage
       price: req.body.price,
       stock: req.body.stock,
       description: req.body.description,
-      imageUrl: resolveItemImageInput({
+      imageUrl: await resolveItemImageInput({
         file: req.file,
         imageUrl: req.body.imageUrl,
         fallbackImageUrl: req.body.currentImageUrl,
@@ -1568,8 +1699,6 @@ app.post("/admin/items/:id/name", requireAdmin, (req, res) => {
 });
 
 app.post("/admin/items/:id/ai-name", requireAdmin, upload.single("aiProductImage"), async (req, res) => {
-  let uploadedImagePath = "";
-
   try {
     const itemId = String(req.params.id || "");
     const items = getItems();
@@ -1587,9 +1716,8 @@ app.post("/admin/items/:id/ai-name", requireAdmin, upload.single("aiProductImage
       throw new Error("Uploaded file must be an image.");
     }
 
-    uploadedImagePath = String(req.file.path || "");
     const suggestion = await suggestProductNameFromImage({
-      imagePath: uploadedImagePath,
+      imageBase64: req.file.buffer.toString("base64"),
       mimeType: req.file.mimetype,
       category: item.category,
       currentName: item.name,
@@ -1605,14 +1733,6 @@ app.post("/admin/items/:id/ai-name", requireAdmin, upload.single("aiProductImage
       "/admin/orders?tab=links&error=" +
         encodeURIComponent(error.message || "Failed to generate product name from image.")
     );
-  } finally {
-    if (uploadedImagePath && fs.existsSync(uploadedImagePath)) {
-      try {
-        fs.unlinkSync(uploadedImagePath);
-      } catch (_cleanupError) {
-        // ignore cleanup errors
-      }
-    }
   }
 });
 
