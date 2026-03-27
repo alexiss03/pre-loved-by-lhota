@@ -93,17 +93,24 @@ function ensureLocalUploadsDir(subdirectory = "") {
 
 function getSupabaseApiConfigOrThrow() {
   const url = String(process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   const apiKey = [
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceRoleKey,
     process.env.SUPABASE_PUBLISHABLE_KEY,
     process.env.SUPABASE_ANON_KEY,
     process.env.SUPABASE_KEY,
   ]
     .map((value) => String(value || "").trim())
     .find(Boolean);
+  const requireServiceRole = process.env.NODE_ENV === "production" &&
+    ACTIVE_UPLOAD_STORAGE_PROVIDER === UPLOAD_STORAGE_PROVIDERS.SUPABASE;
 
   if (!url || !apiKey) {
     throw new Error("Supabase URL and API key are required for persistent storage.");
+  }
+
+  if (requireServiceRole && !serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required in production when uploads use Supabase.");
   }
 
   return { url, apiKey };
@@ -203,6 +210,14 @@ ensureDataFile();
 if (ACTIVE_UPLOAD_STORAGE_PROVIDER === UPLOAD_STORAGE_PROVIDERS.LOCAL) {
   ensureLocalUploadsDir();
 }
+
+console.log(
+  `[storage] db=${ACTIVE_STORAGE_PROVIDER} uploads=${ACTIVE_UPLOAD_STORAGE_PROVIDER} ` +
+    `allowLocalInProduction=${isTruthyEnv(process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION)} ` +
+    `supabaseUrl=${process.env.SUPABASE_URL ? "set" : "missing"} ` +
+    `serviceRole=${process.env.SUPABASE_SERVICE_ROLE_KEY ? "set" : "missing"} ` +
+    `uploadBucket=${process.env.SUPABASE_STORAGE_BUCKET ? "set" : "missing"}`
+);
 
 const upload = multer({
   storage: multer.memoryStorage(),

@@ -202,17 +202,25 @@ function readSeedStoreFromSnapshot() {
 
 function getSupabaseConfigOrThrow() {
   const url = String(process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   const apiKeyCandidates = [
-    String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
+    serviceRoleKey,
     String(process.env.SUPABASE_PUBLISHABLE_KEY || "").trim(),
     String(process.env.SUPABASE_ANON_KEY || "").trim(),
     String(process.env.SUPABASE_KEY || "").trim(),
   ];
   const apiKey = apiKeyCandidates.find((value) => value) || "";
+  const requireServiceRole = process.env.NODE_ENV === "production" && ACTIVE_STORAGE_PROVIDER === STORAGE_PROVIDERS.SUPABASE;
 
   if (!url || !apiKey) {
     throw new Error(
       "SUPABASE_URL and a Supabase API key are required when STORAGE_PROVIDER=SUPABASE."
+    );
+  }
+
+  if (requireServiceRole && !serviceRoleKey) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required in production when STORAGE_PROVIDER=SUPABASE."
     );
   }
 
@@ -251,6 +259,11 @@ function executeSupabaseRequest({ method, pathWithQuery, body, preferHeader = ""
   try {
     return execFileSync("curl", args, { encoding: "utf-8" });
   } catch (error) {
+    if (error && error.code === "ENOENT") {
+      throw new Error(
+        "curl is not installed in this runtime image. Install curl or switch the Supabase adapter away from execFileSync."
+      );
+    }
     const output = String((error && error.stderr) || (error && error.message) || "").trim();
     throw new Error(
       output ||

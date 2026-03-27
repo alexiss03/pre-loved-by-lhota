@@ -52,7 +52,7 @@ Important env values:
 - `FROM_NAME`, `SMTP_REJECT_UNAUTHORIZED`: optional SMTP sender/tls settings
 - `SESSION_SECRET`: session encryption secret
 - `STORAGE_PROVIDER`: `SQLITE` (default), `SUPABASE`, or `JSON`
-- `SUPABASE_URL`, plus one key: `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY`
+- `SUPABASE_URL`, plus one key locally; in production use `SUPABASE_SERVICE_ROLE_KEY`
 - `UPLOAD_STORAGE_PROVIDER`: `LOCAL` or `SUPABASE`
 - `SUPABASE_STORAGE_BUCKET`: required when uploads should persist in Supabase Storage
 - `ALLOW_LOCAL_STORAGE_IN_PRODUCTION`: keep `false` so production fails instead of silently using local container storage
@@ -117,6 +117,7 @@ npm start
 
 The app will migrate current local snapshot data into Supabase automatically when remote state is empty.
 For persistent uploads, create a public Storage bucket in Supabase and use that bucket name in `SUPABASE_STORAGE_BUCKET`.
+In production, the app now expects `SUPABASE_SERVICE_ROLE_KEY` for both DB writes and Supabase Storage uploads.
 
 ## Admin Login
 
