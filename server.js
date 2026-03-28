@@ -1307,7 +1307,7 @@ app.get("/admin/login", (req, res) => {
     return;
   }
 
-  res.render("admin-login", { error: "" });
+  res.render("admin-login", { error: String(req.query.error || "") });
 });
 
 app.post("/admin/login", (req, res) => {
@@ -1330,51 +1330,54 @@ app.post("/admin/logout", (req, res) => {
 });
 
 app.get("/admin/orders", requireAdmin, async (req, res) => {
-  const orders = getOrders();
-  const items = getItems();
-  const analytics = buildAdminAnalytics({ orders, items });
-  const inventoryItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
-  const paymongoCheckout = getPaymongoCheckoutLinks();
-  const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
-  const adminNotifications = getAdminNotificationSettings();
-  const smtpSettings = getSmtpSettings();
-  const facebookAutoPost = getFacebookAutoPostConfig();
-  const smtpStatus = getSmtpConfigStatus();
-
   try {
+    const orders = getOrders();
+    const items = getItems();
+    const analytics = buildAdminAnalytics({ orders, items });
+    const inventoryItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+    const paymongoCheckout = getPaymongoCheckoutLinks();
+    const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const adminNotifications = getAdminNotificationSettings();
+    const smtpSettings = getSmtpSettings();
+    const facebookAutoPost = getFacebookAutoPostConfig();
+    const smtpStatus = getSmtpConfigStatus();
+
     await sendPendingOrderReminders(orders);
+    const activeOrders = orders.filter((order) => !order.isArchived);
+    const archivedOrders = orders.filter((order) => order.isArchived);
+    const pendingOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.PENDING);
+    const paidOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.PAID);
+    const forDeliveryOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.FOR_DELIVERY);
+    const receivedOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.RECEIVED);
+
+    res.render("admin-orders", {
+      items,
+      inventoryItems,
+      inventoryCategories: Object.values(ITEM_CATEGORIES),
+      analytics,
+      paymongoCheckout,
+      baseUrl,
+      adminNotifications,
+      smtpSettings,
+      pendingReminderHours: UNPROCESSED_ORDER_REMINDER_HOURS,
+      smtpStatus,
+      facebookAutoPost,
+      facebookPostTime: toTimeInput(facebookAutoPost.hour, facebookAutoPost.minute),
+      pendingOrders,
+      paidOrders,
+      forDeliveryOrders,
+      receivedOrders,
+      archivedOrders,
+      message: req.query.message || "",
+      error: req.query.error || "",
+    });
   } catch (error) {
-    console.error("Pending reminder scan failed:", error.message);
+    console.error("Admin dashboard failed to load:", error);
+    const fallbackMessage = error && error.message
+      ? `Admin dashboard failed to load: ${error.message}`
+      : "Admin dashboard failed to load.";
+    res.redirect(`/admin/login?error=${encodeURIComponent(fallbackMessage)}`);
   }
-
-  const activeOrders = orders.filter((order) => !order.isArchived);
-  const archivedOrders = orders.filter((order) => order.isArchived);
-  const pendingOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.PENDING);
-  const paidOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.PAID);
-  const forDeliveryOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.FOR_DELIVERY);
-  const receivedOrders = activeOrders.filter((order) => order.status === ORDER_STATUSES.RECEIVED);
-
-  res.render("admin-orders", {
-    items,
-    inventoryItems,
-    inventoryCategories: Object.values(ITEM_CATEGORIES),
-    analytics,
-    paymongoCheckout,
-    baseUrl,
-    adminNotifications,
-    smtpSettings,
-    pendingReminderHours: UNPROCESSED_ORDER_REMINDER_HOURS,
-    smtpStatus,
-    facebookAutoPost,
-    facebookPostTime: toTimeInput(facebookAutoPost.hour, facebookAutoPost.minute),
-    pendingOrders,
-    paidOrders,
-    forDeliveryOrders,
-    receivedOrders,
-    archivedOrders,
-    message: req.query.message || "",
-    error: req.query.error || "",
-  });
 });
 
 app.post("/admin/smtp/settings", requireAdmin, (req, res) => {
