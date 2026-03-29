@@ -549,6 +549,21 @@ function normalizeItems(store) {
 function normalizeStoreStructure(store) {
   let hasChanges = false;
 
+  if (!Array.isArray(store.items)) {
+    store.items = [];
+    hasChanges = true;
+  }
+
+  if (!Array.isArray(store.orders)) {
+    store.orders = [];
+    hasChanges = true;
+  }
+
+  if (!Array.isArray(store.users)) {
+    store.users = [];
+    hasChanges = true;
+  }
+
   if (!store.meta || typeof store.meta !== "object") {
     store.meta = {};
     hasChanges = true;
@@ -558,11 +573,6 @@ function normalizeStoreStructure(store) {
     const nextOrderId =
       (store.orders || []).reduce((max, order) => Math.max(max, Number(order.id) || 0), 0) + 1;
     store.meta.nextOrderId = nextOrderId;
-    hasChanges = true;
-  }
-
-  if (!Array.isArray(store.users)) {
-    store.users = [];
     hasChanges = true;
   }
 
