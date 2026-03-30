@@ -933,6 +933,10 @@ input.piece-input {
   flex-wrap: wrap;
 }
 
+.facebook-pages-form {
+  margin: 0 0 0.8rem;
+}
+
 .facebook-post-status {
   margin-top: 0.8rem;
   border: 1px solid #e4d8cb;
@@ -942,6 +946,19 @@ input.piece-input {
 
 .facebook-post-status p {
   margin: 0.3rem 0;
+}
+
+.facebook-pages-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.8rem 0;
+}
+
+.facebook-page-card {
+  border: 1px solid #e4d8cb;
+  background: #fffdf9;
+  padding: 0.75rem;
 }
 
 .inventory-list {

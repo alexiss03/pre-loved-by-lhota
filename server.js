@@ -55,7 +55,7 @@ const {
   sendNewOrderAdminEmail,
   sendUnprocessedOrderReminderEmail,
 } = require("./utils/mailer");
-const { postRandomItemsToFacebook } = require("./utils/facebookPoster");
+const { fetchFacebookPages, postRandomItemsToFacebook } = require("./utils/facebookPoster");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -360,6 +360,39 @@ function normalizeFacebookToken(value) {
 function looksLikeFacebookAccessToken(value) {
   const token = String(value || "").trim();
   return /^EA[A-Za-z0-9]/.test(token) && token.length >= 60;
+}
+
+function getFacebookConnectRedirectUri(req, config) {
+  const configured = String((config && config.loginRedirectUri) || "").trim();
+  if (configured) {
+    return configured;
+  }
+  return `${process.env.PUBLIC_BASE_URL || toBaseUrlFromRequest(req)}/admin/facebook/connect/callback`;
+}
+
+function buildFacebookLoginUrl(req, config) {
+  const appId = String((config && config.appId) || "").trim();
+  if (!appId) {
+    throw new Error("Facebook App ID is required before connecting Facebook login.");
+  }
+
+  const redirectUri = getFacebookConnectRedirectUri(req, config);
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    scope: "pages_show_list,pages_read_engagement,pages_manage_posts",
+    response_type: "code",
+  });
+
+  return `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
+}
+
+function getSelectedFacebookPage(config, selectedPageId) {
+  const pages = Array.isArray(config && config.availablePages) ? config.availablePages : [];
+  if (!selectedPageId) {
+    return null;
+  }
+  return pages.find((page) => String(page.id) === String(selectedPageId)) || null;
 }
 
 function isValidEmail(value) {
@@ -1481,24 +1514,41 @@ app.post("/admin/facebook-autopost/settings", requireAdmin, (req, res) => {
   try {
     const existing = getFacebookAutoPostConfig();
     const enabled = String(req.body.enabled || "") === "1";
+    const appIdInput = String(req.body.appId || "").trim();
+    const appSecretInput = String(req.body.appSecret || "").trim();
+    const loginRedirectUriInput = String(req.body.loginRedirectUri || "").trim();
+    const userAccessTokenInput = normalizeFacebookToken(req.body.userAccessToken);
+    const selectedPageIdInput = String(req.body.selectedPageId || "").trim();
     const pageIdInput = String(req.body.pageId || "").trim();
     const tokenInput = normalizeFacebookToken(req.body.pageAccessToken);
     const baseUrlInput = String(req.body.baseUrl || "").trim();
     const timezoneInput = String(req.body.timezone || "").trim();
     const parsedTime = parseTimeInput(req.body.postTime, existing.hour, existing.minute);
     const itemsPerPost = clampItemsPerPost(req.body.itemsPerPost);
+    const selectedPage = getSelectedFacebookPage(existing, selectedPageIdInput || existing.selectedPageId);
 
     const nextConfig = {
       ...existing,
       enabled,
+      appId: appIdInput || existing.appId,
+      appSecret: appSecretInput || existing.appSecret,
+      loginRedirectUri: loginRedirectUriInput || existing.loginRedirectUri || getFacebookConnectRedirectUri(req, existing),
+      userAccessToken: userAccessTokenInput || existing.userAccessToken,
+      selectedPageId: selectedPageIdInput || existing.selectedPageId,
       pageId: pageIdInput || existing.pageId,
-      pageAccessToken: tokenInput || existing.pageAccessToken,
+      pageName: selectedPage ? selectedPage.name : existing.pageName,
+      pageAccessToken: tokenInput || (selectedPage ? selectedPage.accessToken : existing.pageAccessToken),
       baseUrl: baseUrlInput || existing.baseUrl || toBaseUrlFromRequest(req),
       timezone: timezoneInput || existing.timezone || "Asia/Manila",
       hour: parsedTime.hour,
       minute: parsedTime.minute,
       itemsPerPost,
     };
+
+    if (selectedPage && !pageIdInput) {
+      nextConfig.pageId = selectedPage.id;
+      nextConfig.pageName = selectedPage.name;
+    }
 
     if (enabled && !nextConfig.pageId) {
       throw new Error("Facebook Page ID is required when auto-post is enabled.");
@@ -1522,6 +1572,127 @@ app.post("/admin/facebook-autopost/settings", requireAdmin, (req, res) => {
     res.redirect(
       "/admin/orders?error=" +
         encodeURIComponent(error.message || "Failed to save Facebook auto-post settings.")
+    );
+  }
+});
+
+app.get("/admin/facebook/connect", requireAdmin, (req, res) => {
+  try {
+    const config = getFacebookAutoPostConfig();
+    if (!String(config.appSecret || "").trim()) {
+      throw new Error("Save your Facebook App Secret first before starting Facebook login.");
+    }
+
+    const nextConfig = {
+      ...config,
+      loginRedirectUri: getFacebookConnectRedirectUri(req, config),
+    };
+    saveFacebookAutoPostConfig(nextConfig);
+    res.redirect(buildFacebookLoginUrl(req, nextConfig));
+  } catch (error) {
+    res.redirect(
+      "/admin/orders?tab=facebook&error=" +
+        encodeURIComponent(error.message || "Failed to start Facebook login.")
+    );
+  }
+});
+
+app.get("/admin/facebook/connect/callback", requireAdmin, async (req, res) => {
+  try {
+    const config = getFacebookAutoPostConfig();
+    if (String(req.query.error || "").trim()) {
+      throw new Error(String(req.query.error_description || req.query.error || "Facebook login was cancelled."));
+    }
+
+    const code = String(req.query.code || "").trim();
+    if (!code) {
+      throw new Error("Facebook did not return an authorization code.");
+    }
+
+    const appId = String(config.appId || "").trim();
+    const appSecret = String(config.appSecret || "").trim();
+    const redirectUri = getFacebookConnectRedirectUri(req, config);
+    if (!appId || !appSecret) {
+      throw new Error("Facebook App ID and App Secret are required to finish Facebook login.");
+    }
+
+    const tokenParams = new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: redirectUri,
+      code,
+    });
+
+    const tokenResponse = await fetch(`https://graph.facebook.com/v20.0/oauth/access_token?${tokenParams.toString()}`);
+    const tokenData = await tokenResponse.json().catch(() => ({}));
+
+    if (!tokenResponse.ok || tokenData.error || !tokenData.access_token) {
+      throw new Error(
+        String((tokenData && tokenData.error && tokenData.error.message) || "Failed to exchange Facebook login code.")
+      );
+    }
+
+    const userAccessToken = normalizeFacebookToken(tokenData.access_token);
+    const pages = await fetchFacebookPages(userAccessToken);
+    const selectedPage = pages[0] || null;
+
+    saveFacebookAutoPostConfig({
+      ...config,
+      loginRedirectUri: redirectUri,
+      userAccessToken,
+      availablePages: pages,
+      selectedPageId: selectedPage ? selectedPage.id : "",
+      pageId: selectedPage ? selectedPage.id : config.pageId,
+      pageName: selectedPage ? selectedPage.name : config.pageName,
+      pageAccessToken: selectedPage ? selectedPage.accessToken : config.pageAccessToken,
+    });
+
+    res.redirect(
+      "/admin/orders?tab=facebook&message=" +
+        encodeURIComponent(`Facebook connected. ${pages.length} page(s) loaded.`)
+    );
+  } catch (error) {
+    res.redirect(
+      "/admin/orders?tab=facebook&error=" +
+        encodeURIComponent(error.message || "Failed to complete Facebook login.")
+    );
+  }
+});
+
+app.post("/admin/facebook/pages/sync", requireAdmin, async (req, res) => {
+  try {
+    const existing = getFacebookAutoPostConfig();
+    const userAccessToken = normalizeFacebookToken(req.body.userAccessToken || existing.userAccessToken);
+    if (!userAccessToken) {
+      throw new Error("Facebook user access token is required to load pages.");
+    }
+
+    const pages = await fetchFacebookPages(userAccessToken);
+    const selectedPageId = String(existing.selectedPageId || "").trim();
+    const selectedPage =
+      pages.find((page) => page.id === selectedPageId) ||
+      pages.find((page) => page.id === String(existing.pageId || "").trim()) ||
+      pages[0] ||
+      null;
+
+    saveFacebookAutoPostConfig({
+      ...existing,
+      userAccessToken,
+      availablePages: pages,
+      selectedPageId: selectedPage ? selectedPage.id : "",
+      pageId: selectedPage ? selectedPage.id : existing.pageId,
+      pageName: selectedPage ? selectedPage.name : existing.pageName,
+      pageAccessToken: selectedPage ? selectedPage.accessToken : existing.pageAccessToken,
+    });
+
+    res.redirect(
+      "/admin/orders?tab=facebook&message=" +
+        encodeURIComponent(`Loaded ${pages.length} Facebook page(s).`)
+    );
+  } catch (error) {
+    res.redirect(
+      "/admin/orders?tab=facebook&error=" +
+        encodeURIComponent(error.message || "Failed to load Facebook pages.")
     );
   }
 });

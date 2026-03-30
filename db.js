@@ -61,7 +61,14 @@ const DEFAULT_SMTP_SETTINGS = Object.freeze({
 });
 const DEFAULT_FACEBOOK_AUTO_POST = Object.freeze({
   enabled: false,
+  appId: "",
+  appSecret: "",
+  loginRedirectUri: "",
+  userAccessToken: "",
+  selectedPageId: "",
+  availablePages: [],
   pageId: "",
+  pageName: "",
   pageAccessToken: "",
   baseUrl: "http://localhost:3002",
   timezone: "Asia/Manila",
@@ -642,11 +649,29 @@ function clampInteger(value, min, max, fallback) {
 }
 
 function normalizeFacebookAutoPostConfig(config) {
+  const availablePages = Array.isArray(config && config.availablePages)
+    ? config.availablePages
+        .map((page) => ({
+          id: String((page && page.id) || "").trim(),
+          name: String((page && page.name) || "").trim(),
+          accessToken: String((page && (page.accessToken || page.access_token)) || "").trim(),
+          category: String((page && page.category) || "").trim(),
+        }))
+        .filter((page) => page.id && page.name)
+    : [];
+
   return {
     ...DEFAULT_FACEBOOK_AUTO_POST,
     ...config,
     enabled: Boolean(config && config.enabled),
+    appId: String((config && config.appId) || "").trim(),
+    appSecret: String((config && config.appSecret) || "").trim(),
+    loginRedirectUri: String((config && config.loginRedirectUri) || "").trim(),
+    userAccessToken: String((config && config.userAccessToken) || "").trim(),
+    selectedPageId: String((config && config.selectedPageId) || "").trim(),
+    availablePages,
     pageId: String((config && config.pageId) || "").trim(),
+    pageName: String((config && config.pageName) || "").trim(),
     pageAccessToken: String((config && config.pageAccessToken) || "").trim(),
     baseUrl: String((config && config.baseUrl) || DEFAULT_FACEBOOK_AUTO_POST.baseUrl).trim(),
     timezone: String((config && config.timezone) || DEFAULT_FACEBOOK_AUTO_POST.timezone).trim(),

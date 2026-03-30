@@ -171,6 +171,39 @@ async function postRandomItemsToFacebook(config, allItems) {
   };
 }
 
+async function fetchFacebookPages(userAccessToken) {
+  const accessToken = sanitizeAccessToken(userAccessToken);
+
+  if (!accessToken) {
+    throw new Error("Facebook user access token is required to load pages.");
+  }
+
+  if (!looksLikeFacebookAccessToken(accessToken)) {
+    throw new Error("Facebook user access token format looks invalid.");
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token,category&access_token=${encodeURIComponent(accessToken)}`
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.error) {
+    throw new Error(formatFacebookApiError(data?.error || {}, response.status));
+  }
+
+  const pages = Array.isArray(data.data) ? data.data : [];
+  return pages
+    .map((page) => ({
+      id: String(page.id || "").trim(),
+      name: String(page.name || "").trim(),
+      accessToken: sanitizeAccessToken(page.access_token),
+      category: String(page.category || "").trim(),
+    }))
+    .filter((page) => page.id && page.name && page.accessToken);
+}
+
 module.exports = {
+  fetchFacebookPages,
   postRandomItemsToFacebook,
 };

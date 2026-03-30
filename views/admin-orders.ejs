@@ -609,6 +609,58 @@
       </label>
 
       <div>
+        <label for="facebookAppId">Facebook App ID</label>
+        <input id="facebookAppId" name="appId" value="<%= facebookAutoPost.appId || '' %>" placeholder="e.g. 123456789012345" />
+      </div>
+
+      <div>
+        <label for="facebookAppSecret">Facebook App Secret</label>
+        <input
+          id="facebookAppSecret"
+          name="appSecret"
+          type="password"
+          placeholder="<%= facebookAutoPost.appSecret ? 'Leave blank to keep current app secret' : 'Paste Facebook App Secret' %>"
+        />
+      </div>
+
+      <div class="inventory-grid-span">
+        <label for="facebookRedirectUri">Facebook Login Redirect URI</label>
+        <input
+          id="facebookRedirectUri"
+          name="loginRedirectUri"
+          value="<%= facebookAutoPost.loginRedirectUri || '' %>"
+          placeholder="https://your-domain.com/admin/facebook/connect/callback"
+        />
+        <p class="muted">Use this exact callback URL in your Facebook app settings.</p>
+      </div>
+
+      <div class="inventory-grid-span">
+        <label for="facebookUserAccessToken">Facebook User Access Token</label>
+        <input
+          id="facebookUserAccessToken"
+          name="userAccessToken"
+          type="password"
+          placeholder="<%= facebookAutoPost.userAccessToken ? 'Leave blank to keep current user token' : 'Paste a user access token if you want to load pages manually' %>"
+        />
+        <p class="muted">You can use Facebook Login below or paste a user token manually, then load your pages.</p>
+      </div>
+
+      <div>
+        <label for="selectedPageId">Saved Facebook Pages</label>
+        <select id="selectedPageId" name="selectedPageId">
+          <option value="">Select a saved page</option>
+          <% (facebookAutoPost.availablePages || []).forEach((page) => { %>
+            <option
+              value="<%= page.id %>"
+              <%= String(facebookAutoPost.selectedPageId || facebookAutoPost.pageId || '') === String(page.id) ? "selected" : "" %>
+            >
+              <%= page.name %> (<%= page.id %>)
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
         <label for="pageId">Facebook Page ID</label>
         <input id="pageId" name="pageId" value="<%= facebookAutoPost.pageId %>" placeholder="e.g. 1234567890" />
       </div>
@@ -654,8 +706,32 @@
 
     <div class="facebook-post-actions">
       <button type="submit" class="button button-primary">Save Cron Settings</button>
+      <a class="button button-secondary" href="/admin/facebook/connect">Facebook Login</a>
     </div>
   </form>
+
+  <form class="facebook-pages-form" action="/admin/facebook/pages/sync" method="POST">
+    <input type="hidden" name="userAccessToken" value="<%= facebookAutoPost.userAccessToken || '' %>" />
+    <button type="submit" class="button button-secondary">Load Facebook Pages</button>
+  </form>
+
+  <div class="facebook-post-status">
+    <p><strong>Connected User Token:</strong> <%= facebookAutoPost.userAccessToken ? "Saved" : "Not saved" %></p>
+    <p><strong>Selected Page:</strong> <%= facebookAutoPost.pageName || facebookAutoPost.pageId || "-" %></p>
+    <p><strong>Saved Pages:</strong> <%= (facebookAutoPost.availablePages || []).length %></p>
+  </div>
+
+  <% if ((facebookAutoPost.availablePages || []).length > 0) { %>
+    <div class="facebook-pages-list">
+      <% facebookAutoPost.availablePages.forEach((page) => { %>
+        <article class="facebook-page-card">
+          <strong><%= page.name %></strong>
+          <p class="muted">Page ID: <%= page.id %></p>
+          <p class="muted">Category: <%= page.category || "-" %></p>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
 
   <form action="/admin/facebook-autopost/run" method="POST">
     <button type="submit" class="button">Post Random Items Now</button>
