@@ -1,13 +1,54 @@
-<%- include('partials/header', { title: "Admin Orders" }) %>
+<%- include('partials/header', { title: isPlatformAdmin ? "Admin Orders" : "Store Manager Dashboard", storeBasePath, storeName, storeCartKey }) %>
 
 <section class="section-head admin-header">
   <div>
-    <h1>Admin Orders Dashboard</h1>
-    <p>Manage payment approvals, delivery progress, and buyer updates.</p>
+    <h1><%= isPlatformAdmin ? "Admin Orders Dashboard" : "Store Manager Dashboard" %></h1>
+    <p>
+      Managing <strong><%= currentStore ? currentStore.name : storeName %></strong>
+      <% if (isPlatformAdmin) { %>
+        across platform-level store operations.
+      <% } else { %>
+        with store-scoped orders, inventory, and settings.
+      <% } %>
+    </p>
   </div>
-  <form action="/admin/logout" method="POST">
-    <button class="button" type="submit">Logout</button>
-  </form>
+  <div class="admin-header-actions">
+    <% if (isPlatformAdmin) { %>
+      <form action="/admin/logout" method="POST">
+        <button class="button" type="submit">Logout</button>
+      </form>
+    <% } else { %>
+      <form action="/manager/logout" method="POST">
+        <button class="button" type="submit">Logout</button>
+      </form>
+    <% } %>
+  </div>
+</section>
+
+<section class="card admin-store-bar">
+  <div>
+    <h2>Active Store</h2>
+    <p class="muted">
+      Public storefront:
+      <a href="<%= storeBasePath || '/' %>" target="_blank" rel="noreferrer"><%= storeBasePath || "/" %></a>
+    </p>
+    <% if (currentStoreManager) { %>
+      <p class="muted">Manager: <strong><%= currentStoreManager.fullName || currentStoreManager.email %></strong></p>
+    <% } %>
+  </div>
+  <% if (isPlatformAdmin) { %>
+    <form action="/admin/orders" method="GET" class="admin-store-switcher">
+      <label for="storeId">Switch Store</label>
+      <select id="storeId" name="storeId">
+        <% stores.forEach((storeOption) => { %>
+          <option value="<%= storeOption.id %>" <%= currentStore && currentStore.id === storeOption.id ? "selected" : "" %>>
+            <%= storeOption.name %> (<%= storeOption.slug %>)
+          </option>
+        <% }) %>
+      </select>
+      <button type="submit" class="button button-secondary">Open</button>
+    </form>
+  <% } %>
 </section>
 
 <% if (message) { %>
@@ -36,10 +77,88 @@
   <button type="button" class="admin-tab-button" data-admin-tab-trigger="links" role="tab" aria-selected="false">
     Direct Links
   </button>
+  <% if (isPlatformAdmin) { %>
+    <button type="button" class="admin-tab-button" data-admin-tab-trigger="stores" role="tab" aria-selected="false">
+      Stores
+    </button>
+  <% } %>
   <button type="button" class="admin-tab-button" data-admin-tab-trigger="archived" role="tab" aria-selected="false">
     Archived
   </button>
 </nav>
+
+<% if (isPlatformAdmin) { %>
+  <section class="card admin-tab-panel" data-admin-tab="stores">
+    <h2>Stores</h2>
+    <p class="muted">Create separate storefronts and assign a dedicated store manager to each one.</p>
+
+    <div class="analytics-grid analytics-grid-secondary">
+      <section class="card analytics-panel">
+        <h3>Create Store</h3>
+        <form class="inventory-create-form" action="/admin/stores/create" method="POST">
+          <label for="storeName">Store Name</label>
+          <input id="storeName" name="name" required placeholder="Lhota Bags" />
+
+          <label for="storeSlug">Store Slug</label>
+          <input id="storeSlug" name="slug" placeholder="lhota-bags" />
+
+          <label for="storeDescription">Description</label>
+          <textarea id="storeDescription" name="description" rows="3" placeholder="Curated store description"></textarea>
+
+          <label for="subscriptionPlan">Subscription Plan</label>
+          <input id="subscriptionPlan" name="subscriptionPlan" value="starter" />
+
+          <label for="subscriptionStatus">Subscription Status</label>
+          <select id="subscriptionStatus" name="subscriptionStatus">
+            <option value="ACTIVE">Active</option>
+            <option value="TRIAL">Trial</option>
+            <option value="PAST_DUE">Past Due</option>
+            <option value="PAUSED">Paused</option>
+          </select>
+
+          <button type="submit" class="button button-primary">Create Store</button>
+        </form>
+      </section>
+
+      <section class="card analytics-panel">
+        <h3>Create Store Manager</h3>
+        <form class="inventory-create-form" action="/admin/store-managers/create" method="POST">
+          <label for="managerStoreId">Store</label>
+          <select id="managerStoreId" name="storeId" required>
+            <% stores.forEach((storeOption) => { %>
+              <option value="<%= storeOption.id %>" <%= currentStore && currentStore.id === storeOption.id ? "selected" : "" %>>
+                <%= storeOption.name %>
+              </option>
+            <% }) %>
+          </select>
+
+          <label for="managerFullName">Full Name</label>
+          <input id="managerFullName" name="fullName" required placeholder="Maria Lhota" />
+
+          <label for="managerEmail">Email</label>
+          <input id="managerEmail" name="email" type="email" required placeholder="manager@example.com" />
+
+          <label for="managerPassword">Password</label>
+          <input id="managerPassword" name="password" type="password" minlength="8" required />
+
+          <button type="submit" class="button button-primary">Create Manager</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="analytics-grid analytics-grid-secondary">
+      <% stores.forEach((storeOption) => { %>
+        <article class="card analytics-panel">
+          <h3><%= storeOption.name %></h3>
+          <p class="muted">Slug: <code><%= storeOption.slug %></code></p>
+          <p class="muted">Plan: <strong><%= storeOption.subscriptionPlan %></strong> / <%= storeOption.subscriptionStatus %></p>
+          <p class="muted">Manager: <%= storeOption.manager ? (storeOption.manager.fullName || storeOption.manager.email) : "Not assigned" %></p>
+          <p class="muted">URL: <a href="/stores/<%= encodeURIComponent(storeOption.slug) %>" target="_blank" rel="noreferrer">/stores/<%= storeOption.slug %></a></p>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+<% } %>
 
 <section class="card admin-tab-panel" data-admin-tab="analytics">
   <h2>Analytics</h2>
@@ -855,7 +974,7 @@
           class="direct-link-url"
           type="text"
           readonly
-          value="<%= `${baseUrl}/buy/${encodeURIComponent(item.id)}?qty=1` %>"
+          value="<%= `${baseUrl}${storeBasePath || ''}/buy/${encodeURIComponent(item.id)}?qty=1` %>"
         />
         <button type="button" class="button copy-direct-link" <%= item.stock < 1 ? "disabled" : "" %>>
           Copy URL
@@ -877,8 +996,8 @@
             <a class="button button-secondary" href="<%= item.paymongoLink %>" target="_blank" rel="noopener noreferrer">Open PayMongo</a>
           <% } %>
         </div>
-        <p class="muted">Waiting Page: <code><%= `${baseUrl}/payment/waiting/${encodeURIComponent(item.id)}` %></code></p>
-        <p class="muted">Callback URL: <code><%= `${baseUrl}/payment/callback?itemId=${encodeURIComponent(item.id)}` %></code></p>
+        <p class="muted">Waiting Page: <code><%= `${baseUrl}${storeBasePath || ''}/payment/waiting/${encodeURIComponent(item.id)}` %></code></p>
+        <p class="muted">Callback URL: <code><%= `${baseUrl}${storeBasePath || ''}/payment/callback?itemId=${encodeURIComponent(item.id)}` %></code></p>
       </form>
     </article>
   <% }) %>
@@ -887,10 +1006,11 @@
 <script>
   (function () {
     const TAB_STORAGE_KEY = "preloved_admin_active_tab";
-    const allowedTabs = new Set(["orders", "analytics", "email", "inventory", "facebook", "links", "archived"]);
+    const allowedTabs = new Set(["orders", "analytics", "email", "inventory", "facebook", "links", "stores", "archived"]);
     const tabButtons = Array.from(document.querySelectorAll("[data-admin-tab-trigger]"));
     const tabPanels = Array.from(document.querySelectorAll("[data-admin-tab]"));
     const baseUrl = "<%= baseUrl %>";
+    const storeBasePath = "<%= storeBasePath || '' %>";
 
     function isValidTab(tab) {
       return allowedTabs.has(tab);
@@ -945,7 +1065,7 @@
     }
 
     function buildUrl(itemId, qty) {
-      return `${baseUrl}/buy/${encodeURIComponent(itemId)}?qty=${qty}`;
+      return `${baseUrl}${storeBasePath}/buy/${encodeURIComponent(itemId)}?qty=${qty}`;
     }
 
     document.querySelectorAll(".direct-link-row").forEach((row) => {

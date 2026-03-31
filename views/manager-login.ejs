@@ -1,0 +1,22 @@
+<%- include('partials/header', { title: "Store Manager Login" }) %>
+
+<section class="card auth-card">
+  <h1>Store Manager Login</h1>
+  <p>Sign in to manage your assigned store’s orders, inventory, and settings.</p>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <form action="/manager/login" method="POST">
+    <label for="email">Manager Email</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required />
+
+    <button type="submit" class="button button-primary button-block">Login</button>
+  </form>
+</section>
+
+<%- include('partials/footer') %>

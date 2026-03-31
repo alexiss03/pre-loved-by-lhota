@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "User Login" }) %>
+<%- include('partials/header', { title: "User Login", storeBasePath, storeName, storeCartKey }) %>
 
 <section class="card auth-card">
   <h1>User Login</h1>
@@ -25,7 +25,7 @@
 
   <p class="muted">
     No account yet?
-    <a href="/signup">Sign up here</a>
+    <a href="/signup?<%= storeBasePath ? `redirectTo=${encodeURIComponent(storeBasePath || "/")}` : '' %>">Sign up here</a>
   </p>
 </section>
 

@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Payment Waiting - Pre-loved by Lhota" }) %>
+<%- include('partials/header', { title: `Payment Waiting - ${storeName || "Pre-loved by Lhota"}`, storeBasePath, storeName, storeCartKey }) %>
 
 <section class="card success-card">
   <h1>PayMongo Payment</h1>
@@ -13,7 +13,7 @@
   <div class="payment-waiting-actions">
     <a class="button button-primary" href="<%= item.paymongoLink %>" target="_blank" rel="noopener noreferrer">Open PayMongo Checkout</a>
     <a class="button button-secondary" href="<%= callbackUrl %>">Simulate Callback</a>
-    <a class="button" href="/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
+    <a class="button" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
   </div>
 
   <p class="muted"><strong>Callback URL:</strong> <code><%= callbackUrl %></code></p>

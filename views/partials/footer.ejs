@@ -1,20 +1,24 @@
     </main>
+    <% const basePath = typeof storeBasePath === "string" ? storeBasePath : ""; %>
+    <% const cartKey = typeof storeCartKey === "string" && storeCartKey ? storeCartKey : "preloved_cart"; %>
+    <% const footerStoreName = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota"; %>
     <footer class="site-footer">
       <div class="container footer-grid">
         <section>
-          <h3>Pre-loved by Lhota</h3>
+          <h3><%= footerStoreName %></h3>
           <p>Timeless preloved pieces in a soft, curated collection.</p>
         </section>
         <section>
           <h3>Shop</h3>
-          <p><a href="/shop/clothes">Clothes</a></p>
-          <p><a href="/shop/bags">Bags</a></p>
-          <p><a href="/shop/miscellaneous">Miscellaneous</a></p>
+          <p><a href="<%= basePath %>/shop/clothes">Clothes</a></p>
+          <p><a href="<%= basePath %>/shop/bags">Bags</a></p>
+          <p><a href="<%= basePath %>/shop/miscellaneous">Miscellaneous</a></p>
         </section>
         <section>
           <h3>Support</h3>
-          <p><a href="/cart">Checkout</a></p>
+          <p><a href="<%= basePath %>/cart">Checkout</a></p>
           <p><a href="/admin/login">Admin Login</a></p>
+          <p><a href="/manager/login">Store Manager Login</a></p>
           <p>Manual payment approval</p>
           <p>Email updates included</p>
         </section>
@@ -23,7 +27,7 @@
     <a
       id="floating-cart-button"
       class="floating-cart-button"
-      href="/cart"
+      href="<%= basePath %>/cart"
       aria-label="Open cart summary"
       aria-controls="cart-summary-sheet"
     >
@@ -47,8 +51,8 @@
         <div class="cart-summary-foot">
           <p>Total: <strong id="cart-summary-total">PHP 0.00</strong></p>
           <div class="cart-summary-buttons">
-            <a class="button button-secondary" href="/cart">View Cart</a>
-            <a class="button button-primary" href="/cart">Checkout</a>
+            <a class="button button-secondary" href="<%= basePath %>/cart">View Cart</a>
+            <a class="button button-primary" href="<%= basePath %>/cart">Checkout</a>
           </div>
         </div>
       </section>
@@ -56,7 +60,8 @@
 
     <script>
       (function () {
-        const CART_KEY = "preloved_cart";
+        const CART_KEY = <%- JSON.stringify(cartKey) %>;
+        const STORE_BASE_PATH = <%- JSON.stringify(basePath) %>;
         const floatingCart = document.getElementById("floating-cart-button");
         const floatingCount = document.getElementById("floating-cart-count");
         const summarySheet = document.getElementById("cart-summary-sheet");
@@ -141,7 +146,7 @@
 
         function openSummary() {
           if (!summarySheet) {
-            window.location.href = "/cart";
+            window.location.href = `${STORE_BASE_PATH}/cart`;
             return;
           }
           renderSummary();
@@ -174,7 +179,8 @@
         }
 
         const path = window.location.pathname || "";
-        if (path === "/cart" || path.startsWith("/admin")) {
+        const cartPath = `${STORE_BASE_PATH}/cart`;
+        if (path === cartPath || path.startsWith("/admin") || path.startsWith("/manager")) {
           floatingCart.style.display = "none";
           if (summarySheet) {
             summarySheet.style.display = "none";

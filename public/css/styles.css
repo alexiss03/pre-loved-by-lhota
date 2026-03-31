@@ -920,6 +920,26 @@ input.piece-input {
   flex-wrap: wrap;
 }
 
+.admin-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-store-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.admin-store-switcher {
+  display: grid;
+  gap: 0.45rem;
+  min-width: min(100%, 320px);
+}
+
 .facebook-post-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1718,6 +1738,11 @@ code {
   .admin-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .admin-store-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .admin-tabs {

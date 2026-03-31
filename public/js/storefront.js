@@ -1,5 +1,6 @@
 (function () {
-  const CART_KEY = "preloved_cart";
+  const CART_KEY = String(window.STORE_CART_KEY || "preloved_cart");
+  const STORE_BASE_PATH = String(window.STORE_BASE_PATH || "");
   const catalog = Array.isArray(window.ITEM_CATALOG) ? window.ITEM_CATALOG : [];
   const modal = document.getElementById("cart-modal");
   const modalClose = document.getElementById("cart-modal-close");
@@ -253,19 +254,19 @@
 
     return `
       <article class="item-card">
-        <a class="item-image-link" href="/product/${encodeURIComponent(item.id)}">
+        <a class="item-image-link" href="${STORE_BASE_PATH}/product/${encodeURIComponent(item.id)}">
           <img src="${safeImageUrl}" alt="${safeName}" />
         </a>
         <div class="item-card-body">
           <span class="item-category">${safeCategory}</span>
-          <h3><a class="item-title-link" href="/product/${encodeURIComponent(item.id)}">${safeName}</a></h3>
+          <h3><a class="item-title-link" href="${STORE_BASE_PATH}/product/${encodeURIComponent(item.id)}">${safeName}</a></h3>
           <p class="item-description">${safeDescription}</p>
           <p class="stock-text">${stock} pieces available</p>
           <p class="price">${formattedPrice}</p>
           <button class="button button-primary add-to-cart" data-item-id="${safeId}" ${outOfStock ? "disabled" : ""}>
             ${outOfStock ? "Out of Stock" : "Add to Cart"}
           </button>
-          <a class="button view-detail-btn" href="/product/${encodeURIComponent(item.id)}">View Details</a>
+          <a class="button view-detail-btn" href="${STORE_BASE_PATH}/product/${encodeURIComponent(item.id)}">View Details</a>
         </div>
       </article>
     `;

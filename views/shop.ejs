@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Shop - Pre-loved by Lhota" }) %>
+<%- include('partials/header', { title: `Shop - ${storeName || "Pre-loved by Lhota"}`, storeBasePath, storeName, storeCartKey }) %>
 
 <%
   function toKey(value) {
@@ -8,15 +8,15 @@
   function categoryHref(value) {
     const key = toKey(value);
     if (key === "CLOTHES") {
-      return "/shop/clothes";
+      return `${storeBasePath}/shop/clothes`;
     }
     if (key === "BAGS") {
-      return "/shop/bags";
+      return `${storeBasePath}/shop/bags`;
     }
     if (key === "MISCELLANEOUS") {
-      return "/shop/miscellaneous";
+      return `${storeBasePath}/shop/miscellaneous`;
     }
-    return `/shop?category=${encodeURIComponent(key)}`;
+    return `${storeBasePath}/shop?category=${encodeURIComponent(key)}`;
   }
 %>
 
@@ -26,7 +26,7 @@
 </section>
 
 <section class="card shop-filters-card">
-  <form class="shop-filters" action="/shop" method="GET">
+  <form class="shop-filters" action="<%= storeBasePath %>/shop" method="GET">
     <div class="shop-filter-field shop-filter-search">
       <label for="q">Search</label>
       <input id="q" name="q" type="text" placeholder="Search item name, category, or description" value="<%= filters.q %>" />
@@ -72,12 +72,12 @@
 
     <div class="shop-filter-actions">
       <button class="button button-primary" type="submit">Apply Filters</button>
-      <a class="button" href="/shop">Reset</a>
+      <a class="button" href="<%= storeBasePath %>/shop">Reset</a>
     </div>
   </form>
 
   <div class="shop-category-tabs">
-    <a class="shop-tab <%= selectedCategoryKey === "ALL" ? "active" : "" %>" href="/shop">All</a>
+    <a class="shop-tab <%= selectedCategoryKey === "ALL" ? "active" : "" %>" href="<%= storeBasePath %>/shop">All</a>
     <% categories.forEach((category) => { %>
       <% const key = toKey(category); %>
       <a class="shop-tab <%= selectedCategoryKey === key ? "active" : "" %>" href="<%= categoryHref(key) %>"><%= category %></a>
@@ -95,19 +95,19 @@
   <div class="item-grid">
     <% items.forEach((item) => { %>
       <article class="item-card">
-        <a class="item-image-link" href="/product/<%= encodeURIComponent(item.id) %>">
+        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
           <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= item.category %></span>
-          <h3><a class="item-title-link" href="/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
           <p class="item-description"><%= item.description %></p>
           <p class="stock-text"><%= item.stock %> pieces available</p>
           <p class="price"><%= formatCurrency(item.price) %></p>
           <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
             <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
           </button>
-          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
         </div>
       </article>
     <% }) %>
@@ -127,12 +127,14 @@
       <button id="cart-modal-cancel" class="button button-secondary" type="button">Cancel</button>
       <button id="cart-modal-confirm" class="button button-primary" type="button">Confirm Add</button>
     </div>
-    <a class="button" href="/cart">Go to Cart</a>
+    <a class="button" href="<%= storeBasePath %>/cart">Go to Cart</a>
   </div>
 </div>
 
 <script>
   window.ITEM_CATALOG = <%- allItemsJson %>;
+  window.STORE_BASE_PATH = <%- JSON.stringify(storeBasePath || "") %>;
+  window.STORE_CART_KEY = <%- JSON.stringify(storeCartKey || "preloved_cart") %>;
 </script>
 <script src="/js/storefront.js"></script>
 

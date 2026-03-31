@@ -1,7 +1,7 @@
-<%- include('partials/header', { title: `${item.name} - Pre-loved by Lhota`, meta }) %>
+<%- include('partials/header', { title: `${item.name} - ${storeName || "Pre-loved by Lhota"}`, meta, storeBasePath, storeName, storeCartKey }) %>
 
 <section class="section-head product-detail-head">
-  <p><a class="breadcrumb-link" href="/shop">Shop</a> / <span><%= item.category %></span></p>
+  <p><a class="breadcrumb-link" href="<%= storeBasePath %>/shop">Shop</a> / <span><%= item.category %></span></p>
   <h1><%= item.name %></h1>
 </section>
 
@@ -25,9 +25,9 @@
       <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
         <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
       </button>
-      <a class="button" href="/cart">Go to Checkout</a>
+      <a class="button" href="<%= storeBasePath %>/cart">Go to Checkout</a>
       <% if (item.paymongoLink) { %>
-        <a class="button button-secondary" href="/payment/waiting/<%= encodeURIComponent(item.id) %>">Pay via PayMongo</a>
+        <a class="button button-secondary" href="<%= storeBasePath %>/payment/waiting/<%= encodeURIComponent(item.id) %>">Pay via PayMongo</a>
       <% } %>
     </div>
   </div>
@@ -40,20 +40,20 @@
 
   <% if (relatedItems.length === 0) { %>
     <div class="card">
-      <p>No related items yet. <a href="/shop">Browse all products</a>.</p>
+      <p>No related items yet. <a href="<%= storeBasePath %>/shop">Browse all products</a>.</p>
     </div>
   <% } %>
 
   <div class="item-grid">
     <% relatedItems.forEach((relatedItem) => { %>
       <article class="item-card">
-        <a class="item-image-link" href="/product/<%= encodeURIComponent(relatedItem.id) %>">
+        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>">
           <img src="<%= relatedItem.imageUrl %>" alt="<%= relatedItem.name %>" />
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= relatedItem.category %></span>
           <h3>
-            <a class="item-title-link" href="/product/<%= encodeURIComponent(relatedItem.id) %>"><%= relatedItem.name %></a>
+            <a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>"><%= relatedItem.name %></a>
           </h3>
           <p class="item-description"><%= relatedItem.description %></p>
           <p class="stock-text"><%= relatedItem.stock %> pieces available</p>
@@ -61,7 +61,7 @@
           <button class="button button-primary add-to-cart" data-item-id="<%= relatedItem.id %>" <%= relatedItem.stock < 1 ? "disabled" : "" %>>
             <%= relatedItem.stock < 1 ? "Out of Stock" : "Add to Cart" %>
           </button>
-          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(relatedItem.id) %>">View Details</a>
+          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>">View Details</a>
         </div>
       </article>
     <% }) %>
@@ -81,12 +81,14 @@
       <button id="cart-modal-cancel" class="button button-secondary" type="button">Cancel</button>
       <button id="cart-modal-confirm" class="button button-primary" type="button">Confirm Add</button>
     </div>
-    <a class="button" href="/cart">Go to Cart</a>
+    <a class="button" href="<%= storeBasePath %>/cart">Go to Cart</a>
   </div>
 </div>
 
 <script>
   window.ITEM_CATALOG = <%- allItemsJson %>;
+  window.STORE_BASE_PATH = <%- JSON.stringify(storeBasePath || "") %>;
+  window.STORE_CART_KEY = <%- JSON.stringify(storeCartKey || "preloved_cart") %>;
 </script>
 <script src="/js/storefront.js"></script>
 

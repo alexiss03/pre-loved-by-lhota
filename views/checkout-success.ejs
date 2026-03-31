@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Order Submitted" }) %>
+<%- include('partials/header', { title: "Order Submitted", storeBasePath, storeName, storeCartKey }) %>
 
 <section class="card success-card">
   <h1>Order Submitted</h1>
@@ -22,11 +22,11 @@
     <p class="muted">SMTP is not configured or email sending failed, so only approval email may be delayed.</p>
   <% } %>
 
-  <a class="button button-primary" href="/">Continue Shopping</a>
+  <a class="button button-primary" href="<%= storeBasePath || '/' %>">Continue Shopping</a>
 </section>
 
 <script>
-  localStorage.removeItem("preloved_cart");
+  localStorage.removeItem("<%= storeCartKey || 'preloved_cart' %>");
 </script>
 
 <%- include('partials/footer') %>

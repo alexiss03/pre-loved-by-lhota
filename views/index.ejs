@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Pre-loved by Lhota Shop" }) %>
+<%- include('partials/header', { title: `${storeName || "Pre-loved by Lhota"} Shop`, storeBasePath, storeName, storeCartKey }) %>
 
 <%
   const clothes = items.filter((item) => item.category === "Clothes");
@@ -24,7 +24,7 @@
     <p class="hero-label">New Collection</p>
     <h1>NEW ARRIVALS</h1>
     <p>Explore our newest preloved pieces for your everyday look.</p>
-    <a class="button peach-button" href="/shop">Shop Now</a>
+    <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
   </div>
 </section>
 
@@ -35,7 +35,7 @@
   <div class="feature-band-copy">
     <h2>Our best sellers are back in stock</h2>
     <p>Discover handpicked favorites before they sell out again.</p>
-    <a class="button peach-button" href="/shop">Shop Now</a>
+    <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
   </div>
 </section>
 
@@ -49,19 +49,19 @@
   <div class="item-grid">
     <% quickPicks.forEach((item) => { %>
       <article class="item-card">
-        <a class="item-image-link" href="/product/<%= encodeURIComponent(item.id) %>">
+        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
           <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= item.category %></span>
-          <h3><a class="item-title-link" href="/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
           <p class="item-description"><%= item.description %></p>
           <p class="stock-text"><%= item.stock %> pieces available</p>
           <p class="price"><%= formatCurrency(item.price) %></p>
           <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
             <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
           </button>
-          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
         </div>
       </article>
     <% }) %>
@@ -77,19 +77,19 @@
   >
     <% feedSeedItems.forEach((item) => { %>
       <article class="item-card">
-        <a class="item-image-link" href="/product/<%= encodeURIComponent(item.id) %>">
+        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
           <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= item.category %></span>
-          <h3><a class="item-title-link" href="/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
           <p class="item-description"><%= item.description %></p>
           <p class="stock-text"><%= item.stock %> pieces available</p>
           <p class="price"><%= formatCurrency(item.price) %></p>
           <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
             <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
           </button>
-          <a class="button view-detail-btn" href="/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
         </div>
       </article>
     <% }) %>
@@ -111,12 +111,14 @@
       <button id="cart-modal-cancel" class="button button-secondary" type="button">Cancel</button>
       <button id="cart-modal-confirm" class="button button-primary" type="button">Confirm Add</button>
     </div>
-    <a class="button" href="/cart">Go to Cart</a>
+    <a class="button" href="<%= storeBasePath %>/cart">Go to Cart</a>
   </div>
 </div>
 
 <script>
   window.ITEM_CATALOG = <%- JSON.stringify(items) %>;
+  window.STORE_BASE_PATH = <%- JSON.stringify(storeBasePath || "") %>;
+  window.STORE_CART_KEY = <%- JSON.stringify(storeCartKey || "preloved_cart") %>;
 </script>
 <script src="/js/storefront.js"></script>
 

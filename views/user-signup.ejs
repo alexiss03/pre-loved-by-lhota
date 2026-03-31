@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Sign Up" }) %>
+<%- include('partials/header', { title: "Sign Up", storeBasePath, storeName, storeCartKey }) %>
 
 <section class="card auth-card">
   <h1>Sign Up</h1>
@@ -9,6 +9,7 @@
   <% } %>
 
   <form action="/signup" method="POST">
+    <input type="hidden" name="redirectTo" value="<%= redirectTo || '/' %>" />
     <label for="fullName">Full Name</label>
     <input id="fullName" name="fullName" value="<%= form.fullName || '' %>" required />
 
@@ -29,7 +30,7 @@
 
   <p class="muted">
     Already have an account?
-    <a href="/login">Login</a>
+    <a href="/login?<%= redirectTo ? `redirectTo=${encodeURIComponent(redirectTo)}` : '' %>">Login</a>
   </p>
 </section>
 

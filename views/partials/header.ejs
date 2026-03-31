@@ -26,6 +26,8 @@
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
+    <% const basePath = typeof storeBasePath === "string" ? storeBasePath : ""; %>
+    <% const brandLabel = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota"; %>
     <header class="site-header">
       <div class="announcement-bar">
         <span class="announcement-arrow">&#8249;</span>
@@ -33,23 +35,23 @@
         <span class="announcement-arrow">&#8250;</span>
       </div>
       <div class="container nav-row">
-        <a class="brand" href="/" aria-label="Pre-loved by Lhota">
+        <a class="brand" href="<%= basePath || '/' %>" aria-label="<%= brandLabel %>">
           <img class="brand-logo" src="/assets/logo-preloved-lhota.svg" alt="Pre-loved by Lhota" />
         </a>
         <nav class="nav-links">
-          <a class="main-nav-link" href="/shop">Shop</a>
-          <a class="main-nav-link" href="/shop/clothes">Clothes</a>
-          <a class="main-nav-link" href="/shop/bags">Bags</a>
-          <a class="main-nav-link" href="/shop/miscellaneous">Miscellaneous</a>
-          <a class="main-nav-link" href="/cart">Cart</a>
+          <a class="main-nav-link" href="<%= basePath %>/shop">Shop</a>
+          <a class="main-nav-link" href="<%= basePath %>/shop/clothes">Clothes</a>
+          <a class="main-nav-link" href="<%= basePath %>/shop/bags">Bags</a>
+          <a class="main-nav-link" href="<%= basePath %>/shop/miscellaneous">Miscellaneous</a>
+          <a class="main-nav-link" href="<%= basePath %>/cart">Cart</a>
         </nav>
         <div class="nav-icons">
-          <a href="/shop" aria-label="Search">&#128269;</a>
+          <a href="<%= basePath %>/shop" aria-label="Search">&#128269;</a>
           <% if (buyerUser) { %>
-            <a href="/logout">Logout</a>
+            <a href="/logout?<%= basePath ? `next=${encodeURIComponent(basePath || "/")}` : '' %>">Logout</a>
           <% } else { %>
-            <a href="/login">Login</a>
-            <a href="/signup">Sign Up</a>
+            <a href="/login?<%= basePath ? `redirectTo=${encodeURIComponent(basePath || "/")}` : '' %>">Login</a>
+            <a href="/signup?<%= basePath ? `redirectTo=${encodeURIComponent(basePath || "/")}` : '' %>">Sign Up</a>
           <% } %>
         </div>
       </div>

@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: "Payment Callback - Pre-loved by Lhota" }) %>
+<%- include('partials/header', { title: `Payment Callback - ${storeName || "Pre-loved by Lhota"}`, storeBasePath, storeName, storeCartKey }) %>
 
 <section class="card success-card">
   <h1>Payment Callback Received</h1>
@@ -17,9 +17,9 @@
 
   <div class="payment-waiting-actions">
     <% if (item) { %>
-      <a class="button button-primary" href="/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
+      <a class="button button-primary" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">Back to Product</a>
     <% } %>
-    <a class="button" href="/shop">Continue Shopping</a>
+    <a class="button" href="<%= storeBasePath %>/shop">Continue Shopping</a>
   </div>
 </section>
 

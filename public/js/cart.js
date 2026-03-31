@@ -1,5 +1,5 @@
 (function () {
-  const CART_KEY = "preloved_cart";
+  const CART_KEY = String(window.STORE_CART_KEY || "preloved_cart");
   const LOCATION_API_BASES = ["https://psgc.cloud/api", "https://psgc.cloud/api/v1"];
 
   const catalog = Array.isArray(window.ITEM_CATALOG) ? window.ITEM_CATALOG : [];

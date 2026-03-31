@@ -86,19 +86,61 @@ const DEFAULT_PAYMONGO_CHECKOUT_LINKS = Object.freeze({
   step: 50,
   links: {},
 });
+const DEFAULT_STORE_SUBSCRIPTION = Object.freeze({
+  plan: "Starter",
+  status: "ACTIVE",
+});
+
+function slugifyStoreName(value) {
+  const text = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return text || "store";
+}
+
+function createStoreSettingsFromLegacyMeta(meta = {}) {
+  return {
+    adminNotifications: { ...DEFAULT_ADMIN_NOTIFICATION_SETTINGS, ...(meta.adminNotifications || {}) },
+    smtpSettings: { ...DEFAULT_SMTP_SETTINGS, ...(meta.smtpSettings || {}) },
+    facebookAutoPost: { ...DEFAULT_FACEBOOK_AUTO_POST, ...(meta.facebookAutoPost || {}) },
+    paymongoCheckoutLinks: { ...DEFAULT_PAYMONGO_CHECKOUT_LINKS, ...(meta.paymongoCheckoutLinks || {}) },
+  };
+}
+
+function createDefaultStore(overrides = {}) {
+  return {
+    id: 1,
+    slug: "pre-loved-by-lhota",
+    name: "Pre-loved by Lhota",
+    description: "Curated preloved pieces.",
+    subscriptionPlan: DEFAULT_STORE_SUBSCRIPTION.plan,
+    subscriptionStatus: DEFAULT_STORE_SUBSCRIPTION.status,
+    managerUserId: null,
+    createdAt: new Date().toISOString(),
+    settings: createStoreSettingsFromLegacyMeta(),
+    ...overrides,
+  };
+}
 
 const initialData = {
   meta: {
     nextOrderId: 1,
     nextUserId: 1,
+    nextStoreId: 2,
+    nextStoreManagerId: 1,
     adminNotifications: { ...DEFAULT_ADMIN_NOTIFICATION_SETTINGS },
     smtpSettings: { ...DEFAULT_SMTP_SETTINGS },
     facebookAutoPost: { ...DEFAULT_FACEBOOK_AUTO_POST },
     paymongoCheckoutLinks: { ...DEFAULT_PAYMONGO_CHECKOUT_LINKS },
   },
+  stores: [createDefaultStore()],
+  storeManagers: [],
   items: [
     {
       id: "CL001",
+      storeId: 1,
       name: "Floral Summer Dress",
       category: "Clothes",
       price: 450,
@@ -111,6 +153,7 @@ const initialData = {
     },
     {
       id: "CL002",
+      storeId: 1,
       name: "Denim Jacket",
       category: "Clothes",
       price: 650,
@@ -123,6 +166,7 @@ const initialData = {
     },
     {
       id: "BG001",
+      storeId: 1,
       name: "Leather Tote Bag",
       category: "Bags",
       price: 1200,
@@ -135,6 +179,7 @@ const initialData = {
     },
     {
       id: "BG002",
+      storeId: 1,
       name: "Canvas Crossbody Bag",
       category: "Bags",
       price: 550,
@@ -147,6 +192,7 @@ const initialData = {
     },
     {
       id: "UT001",
+      storeId: 1,
       name: "Stainless Spoon and Fork Set (12pcs)",
       category: "Miscellaneous",
       price: 350,
@@ -159,6 +205,7 @@ const initialData = {
     },
     {
       id: "UT002",
+      storeId: 1,
       name: "Ceramic Dinner Plate Set (6pcs)",
       category: "Miscellaneous",
       price: 700,
@@ -448,6 +495,14 @@ function normalizeOrders(store) {
   let hasChanges = false;
 
   for (const order of store.orders || []) {
+    if (!Number.isInteger(Number(order.storeId)) || Number(order.storeId) < 1) {
+      order.storeId = 1;
+      hasChanges = true;
+    } else if (order.storeId !== Number(order.storeId)) {
+      order.storeId = Number(order.storeId);
+      hasChanges = true;
+    }
+
     const currentStatus = String(order.status || ORDER_STATUSES.PENDING).toUpperCase();
     let normalizedStatus = currentStatus;
 
@@ -537,6 +592,14 @@ function normalizeItems(store) {
   let hasChanges = false;
 
   for (const item of store.items || []) {
+    if (!Number.isInteger(Number(item.storeId)) || Number(item.storeId) < 1) {
+      item.storeId = 1;
+      hasChanges = true;
+    } else if (item.storeId !== Number(item.storeId)) {
+      item.storeId = Number(item.storeId);
+      hasChanges = true;
+    }
+
     const normalizedPaymongoLink = String(item.paymongoLink || "").trim();
     if (item.paymongoLink !== normalizedPaymongoLink) {
       item.paymongoLink = normalizedPaymongoLink;
@@ -555,6 +618,17 @@ function normalizeItems(store) {
 
 function normalizeStoreStructure(store) {
   let hasChanges = false;
+
+  if (!Array.isArray(store.stores)) {
+    const legacySettings = createStoreSettingsFromLegacyMeta(store.meta || {});
+    store.stores = [createDefaultStore({ settings: legacySettings })];
+    hasChanges = true;
+  }
+
+  if (!Array.isArray(store.storeManagers)) {
+    store.storeManagers = [];
+    hasChanges = true;
+  }
 
   if (!Array.isArray(store.items)) {
     store.items = [];
@@ -589,6 +663,102 @@ function normalizeStoreStructure(store) {
     store.meta.nextUserId = nextUserId;
     hasChanges = true;
   }
+
+  if (!Number.isInteger(store.meta.nextStoreId) || store.meta.nextStoreId < 1) {
+    const nextStoreId =
+      store.stores.reduce((max, entry) => Math.max(max, Number(entry.id) || 0), 0) + 1;
+    store.meta.nextStoreId = nextStoreId;
+    hasChanges = true;
+  }
+
+  if (!Number.isInteger(store.meta.nextStoreManagerId) || store.meta.nextStoreManagerId < 1) {
+    const nextStoreManagerId =
+      store.storeManagers.reduce((max, entry) => Math.max(max, Number(entry.id) || 0), 0) + 1;
+    store.meta.nextStoreManagerId = nextStoreManagerId;
+    hasChanges = true;
+  }
+
+  const seenStoreIds = new Set();
+  const seenStoreSlugs = new Set();
+  const legacyStoreSettings = createStoreSettingsFromLegacyMeta(store.meta || {});
+  store.stores = store.stores.reduce((accumulator, entry, index) => {
+    const numericId = Number(entry && entry.id);
+    const fallbackId = index + 1;
+    const id = Number.isInteger(numericId) && numericId > 0 && !seenStoreIds.has(numericId)
+      ? numericId
+      : fallbackId;
+    seenStoreIds.add(id);
+
+    let slug = slugifyStoreName((entry && entry.slug) || (entry && entry.name) || `store-${id}`);
+    if (seenStoreSlugs.has(slug)) {
+      slug = `${slug}-${id}`;
+      hasChanges = true;
+    }
+    seenStoreSlugs.add(slug);
+
+    const currentSettings = entry && typeof entry.settings === "object" ? entry.settings : legacyStoreSettings;
+    const normalizedSettings = {
+      adminNotifications: normalizeAdminNotificationSettings(currentSettings.adminNotifications || {}),
+      smtpSettings: normalizeSmtpSettings(currentSettings.smtpSettings || {}),
+      facebookAutoPost: normalizeFacebookAutoPostConfig(currentSettings.facebookAutoPost || {}),
+      paymongoCheckoutLinks: normalizePaymongoCheckoutLinks(currentSettings.paymongoCheckoutLinks || {}),
+    };
+
+    const normalizedStore = {
+      id,
+      slug,
+      name: String((entry && entry.name) || `Store ${id}`).trim() || `Store ${id}`,
+      description: String((entry && entry.description) || "").trim(),
+      subscriptionPlan: String((entry && entry.subscriptionPlan) || DEFAULT_STORE_SUBSCRIPTION.plan).trim() || DEFAULT_STORE_SUBSCRIPTION.plan,
+      subscriptionStatus: String((entry && entry.subscriptionStatus) || DEFAULT_STORE_SUBSCRIPTION.status).trim().toUpperCase() || DEFAULT_STORE_SUBSCRIPTION.status,
+      managerUserId: Number.isInteger(Number(entry && entry.managerUserId)) ? Number(entry.managerUserId) : null,
+      createdAt: (entry && entry.createdAt) || new Date().toISOString(),
+      settings: normalizedSettings,
+    };
+
+    if (JSON.stringify(entry || null) !== JSON.stringify(normalizedStore)) {
+      hasChanges = true;
+    }
+
+    accumulator.push(normalizedStore);
+    return accumulator;
+  }, []);
+
+  if (store.stores.length === 0) {
+    store.stores.push(createDefaultStore({ settings: legacyStoreSettings }));
+    hasChanges = true;
+  }
+
+  store.storeManagers = store.storeManagers.reduce((accumulator, entry) => {
+    const id = Number(entry && entry.id);
+    if (!Number.isInteger(id) || id < 1) {
+      hasChanges = true;
+      return accumulator;
+    }
+
+    const normalizedManager = {
+      id,
+      storeId: Number.isInteger(Number(entry && entry.storeId)) ? Number(entry.storeId) : 1,
+      fullName: String((entry && entry.fullName) || "").trim(),
+      email: String((entry && entry.email) || "").trim().toLowerCase(),
+      passwordSalt: String((entry && entry.passwordSalt) || "").trim(),
+      passwordHash: String((entry && entry.passwordHash) || "").trim(),
+      createdAt: (entry && entry.createdAt) || new Date().toISOString(),
+      status: String((entry && entry.status) || "ACTIVE").trim().toUpperCase() || "ACTIVE",
+    };
+
+    if (!normalizedManager.email || !normalizedManager.passwordSalt || !normalizedManager.passwordHash) {
+      hasChanges = true;
+      return accumulator;
+    }
+
+    if (JSON.stringify(entry || null) !== JSON.stringify(normalizedManager)) {
+      hasChanges = true;
+    }
+
+    accumulator.push(normalizedManager);
+    return accumulator;
+  }, []);
 
   const currentAdminNotifications = store.meta.adminNotifications;
   const normalizedAdminNotifications = normalizeAdminNotificationSettings(
@@ -866,9 +1036,98 @@ function writeStore(store) {
   writeJsonSnapshot(store);
 }
 
-function getItems() {
+function normalizeStoreId(value, fallback = 1) {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < 1) {
+    return fallback;
+  }
+  return numeric;
+}
+
+function getDefaultStoreId(store) {
+  const firstStore = Array.isArray(store && store.stores) ? store.stores[0] : null;
+  return normalizeStoreId(firstStore && firstStore.id, 1);
+}
+
+function getStores() {
   const store = readStore();
-  return store.items;
+  return [...store.stores].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+}
+
+function getStoreById(storeId) {
+  const store = readStore();
+  return store.stores.find((entry) => Number(entry.id) === normalizeStoreId(storeId)) || null;
+}
+
+function getStoreBySlug(slug) {
+  const normalizedSlug = slugifyStoreName(slug);
+  if (!normalizedSlug) {
+    return null;
+  }
+  const store = readStore();
+  return store.stores.find((entry) => String(entry.slug || "") === normalizedSlug) || null;
+}
+
+function ensureUniqueStoreSlug(store, desiredSlug, ignoreStoreId = null) {
+  let baseSlug = slugifyStoreName(desiredSlug);
+  let candidate = baseSlug;
+  let suffix = 2;
+  while (
+    store.stores.some((entry) => String(entry.slug || "") === candidate && Number(entry.id) !== Number(ignoreStoreId || 0))
+  ) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function getStoreSettings(store, storeId) {
+  const fallbackStoreId = getDefaultStoreId(store);
+  const targetStoreId = normalizeStoreId(storeId, fallbackStoreId);
+  const targetStore =
+    store.stores.find((entry) => Number(entry.id) === targetStoreId) ||
+    store.stores.find((entry) => Number(entry.id) === fallbackStoreId);
+
+  if (!targetStore) {
+    throw new Error("Store not found.");
+  }
+
+  return targetStore.settings;
+}
+
+function createStore(payload) {
+  const store = readStore();
+  const name = String(payload.name || "").trim();
+  if (!name) {
+    throw new Error("Store name is required.");
+  }
+
+  const slug = ensureUniqueStoreSlug(store, payload.slug || name);
+  const nextStore = {
+    id: store.meta.nextStoreId,
+    slug,
+    name,
+    description: String(payload.description || "").trim(),
+    subscriptionPlan: String(payload.subscriptionPlan || DEFAULT_STORE_SUBSCRIPTION.plan).trim() || DEFAULT_STORE_SUBSCRIPTION.plan,
+    subscriptionStatus: String(payload.subscriptionStatus || DEFAULT_STORE_SUBSCRIPTION.status).trim().toUpperCase() || DEFAULT_STORE_SUBSCRIPTION.status,
+    managerUserId: null,
+    createdAt: new Date().toISOString(),
+    settings: createStoreSettingsFromLegacyMeta(),
+  };
+
+  store.meta.nextStoreId += 1;
+  store.stores.push(nextStore);
+  writeStore(store);
+  return nextStore;
+}
+
+function getItems(storeId = null) {
+  const store = readStore();
+  if (storeId === null || storeId === undefined) {
+    return store.items;
+  }
+  const targetStoreId = normalizeStoreId(storeId, getDefaultStoreId(store));
+  return store.items.filter((entry) => normalizeStoreId(entry.storeId, targetStoreId) === targetStoreId);
 }
 
 function normalizeItemCategory(value) {
@@ -960,9 +1219,15 @@ function generateNextItemId(store, category) {
 
 function createItem(payload) {
   const store = readStore();
+  const storeId = normalizeStoreId(payload.storeId, getDefaultStoreId(store));
+  const targetStore = store.stores.find((entry) => Number(entry.id) === storeId);
+  if (!targetStore) {
+    throw new Error("Store not found.");
+  }
   const category = normalizeItemCategory(payload.category);
   const item = {
     id: generateNextItemId(store, category),
+    storeId,
     name: normalizeItemName(payload.name),
     category,
     price: normalizeItemPrice(payload.price),
@@ -980,7 +1245,16 @@ function createItem(payload) {
 
 function updateItemInventory(itemId, payload) {
   const store = readStore();
-  const item = store.items.find((entry) => entry.id === String(itemId || ""));
+  const storeId = payload && payload.storeId !== undefined ? normalizeStoreId(payload.storeId, getDefaultStoreId(store)) : null;
+  const item = store.items.find((entry) => {
+    if (entry.id !== String(itemId || "")) {
+      return false;
+    }
+    if (storeId === null) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === storeId;
+  });
 
   if (!item) {
     throw new Error("Item not found.");
@@ -998,7 +1272,16 @@ function updateItemInventory(itemId, payload) {
 
 function setItemBlocked(itemId, blocked) {
   const store = readStore();
-  const item = store.items.find((entry) => entry.id === String(itemId || ""));
+  const storeId = arguments.length > 2 ? normalizeStoreId(arguments[2], getDefaultStoreId(store)) : null;
+  const item = store.items.find((entry) => {
+    if (entry.id !== String(itemId || "")) {
+      return false;
+    }
+    if (storeId === null) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === storeId;
+  });
 
   if (!item) {
     throw new Error("Item not found.");
@@ -1011,7 +1294,16 @@ function setItemBlocked(itemId, blocked) {
 
 function updateItemPaymongoLink(itemId, paymongoLink) {
   const store = readStore();
-  const item = store.items.find((entry) => entry.id === String(itemId || ""));
+  const storeId = arguments.length > 2 ? normalizeStoreId(arguments[2], getDefaultStoreId(store)) : null;
+  const item = store.items.find((entry) => {
+    if (entry.id !== String(itemId || "")) {
+      return false;
+    }
+    if (storeId === null) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === storeId;
+  });
 
   if (!item) {
     throw new Error("Item not found.");
@@ -1024,7 +1316,16 @@ function updateItemPaymongoLink(itemId, paymongoLink) {
 
 function updateItemName(itemId, name) {
   const store = readStore();
-  const item = store.items.find((entry) => entry.id === String(itemId || ""));
+  const storeId = arguments.length > 2 ? normalizeStoreId(arguments[2], getDefaultStoreId(store)) : null;
+  const item = store.items.find((entry) => {
+    if (entry.id !== String(itemId || "")) {
+      return false;
+    }
+    if (storeId === null) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === storeId;
+  });
 
   if (!item) {
     throw new Error("Item not found.");
@@ -1044,58 +1345,70 @@ function updateItemName(itemId, name) {
   return item;
 }
 
-function getOrders() {
+function getOrders(storeId = null) {
   const store = readStore();
-  return [...store.orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const list = storeId === null || storeId === undefined
+    ? store.orders
+    : store.orders.filter((entry) => normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId));
+  return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
-function getOrderById(orderId) {
+function getOrderById(orderId, storeId = null) {
   const store = readStore();
-  return store.orders.find((entry) => entry.id === Number(orderId)) || null;
+  return store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  }) || null;
 }
 
-function getAdminNotificationSettings() {
+function getAdminNotificationSettings(storeId = null) {
   const store = readStore();
-  return normalizeAdminNotificationSettings(store.meta.adminNotifications);
+  return normalizeAdminNotificationSettings(getStoreSettings(store, storeId).adminNotifications);
 }
 
-function saveAdminNotificationSettings(nextSettings) {
+function saveAdminNotificationSettings(nextSettings, storeId = null) {
   const store = readStore();
   const normalized = normalizeAdminNotificationSettings(nextSettings);
-  store.meta.adminNotifications = normalized;
+  getStoreSettings(store, storeId).adminNotifications = normalized;
   writeStore(store);
   return normalized;
 }
 
-function getFacebookAutoPostConfig() {
+function getFacebookAutoPostConfig(storeId = null) {
   const store = readStore();
-  return normalizeFacebookAutoPostConfig(store.meta.facebookAutoPost);
+  return normalizeFacebookAutoPostConfig(getStoreSettings(store, storeId).facebookAutoPost);
 }
 
-function getSmtpSettings() {
+function getSmtpSettings(storeId = null) {
   const store = readStore();
-  return normalizeSmtpSettings(store.meta.smtpSettings);
+  return normalizeSmtpSettings(getStoreSettings(store, storeId).smtpSettings);
 }
 
-function saveSmtpSettings(nextSettings) {
+function saveSmtpSettings(nextSettings, storeId = null) {
   const store = readStore();
   const normalized = normalizeSmtpSettings(nextSettings);
-  store.meta.smtpSettings = normalized;
+  getStoreSettings(store, storeId).smtpSettings = normalized;
   writeStore(store);
   return normalized;
 }
 
-function saveFacebookAutoPostConfig(nextConfig) {
+function saveFacebookAutoPostConfig(nextConfig, storeId = null) {
   const store = readStore();
   const normalized = normalizeFacebookAutoPostConfig(nextConfig);
-  store.meta.facebookAutoPost = normalized;
+  getStoreSettings(store, storeId).facebookAutoPost = normalized;
   writeStore(store);
   return normalized;
 }
 
-function setFacebookAutoPostLastResult(payload) {
+function setFacebookAutoPostLastResult(payload, storeId = null) {
   const store = readStore();
-  const current = normalizeFacebookAutoPostConfig(store.meta.facebookAutoPost);
+  const settings = getStoreSettings(store, storeId);
+  const current = normalizeFacebookAutoPostConfig(settings.facebookAutoPost);
 
   current.lastPostStatus = String(payload.status || current.lastPostStatus || "IDLE").toUpperCase();
   current.lastPostMessage = String(payload.message || "");
@@ -1107,17 +1420,17 @@ function setFacebookAutoPostLastResult(payload) {
     current.lastPostedAt = payload.postedAt || new Date().toISOString();
   }
 
-  store.meta.facebookAutoPost = current;
+  settings.facebookAutoPost = current;
   writeStore(store);
   return current;
 }
 
-function getPaymongoCheckoutLinks() {
+function getPaymongoCheckoutLinks(storeId = null) {
   const store = readStore();
-  return normalizePaymongoCheckoutLinks(store.meta.paymongoCheckoutLinks);
+  return normalizePaymongoCheckoutLinks(getStoreSettings(store, storeId).paymongoCheckoutLinks);
 }
 
-function savePaymongoAmountLink(amount, link) {
+function savePaymongoAmountLink(amount, link, storeId = null) {
   const step = DEFAULT_PAYMONGO_CHECKOUT_LINKS.step;
   const numericAmount = Number(amount);
   if (!Number.isInteger(numericAmount) || numericAmount < step || numericAmount % step !== 0) {
@@ -1130,14 +1443,15 @@ function savePaymongoAmountLink(amount, link) {
   }
 
   const store = readStore();
-  const current = normalizePaymongoCheckoutLinks(store.meta.paymongoCheckoutLinks);
+  const settings = getStoreSettings(store, storeId);
+  const current = normalizePaymongoCheckoutLinks(settings.paymongoCheckoutLinks);
   current.links[String(numericAmount)] = normalizedLink;
-  store.meta.paymongoCheckoutLinks = current;
+  settings.paymongoCheckoutLinks = current;
   writeStore(store);
   return current;
 }
 
-function deletePaymongoAmountLink(amount) {
+function deletePaymongoAmountLink(amount, storeId = null) {
   const step = DEFAULT_PAYMONGO_CHECKOUT_LINKS.step;
   const numericAmount = Number(amount);
   if (!Number.isInteger(numericAmount) || numericAmount < step || numericAmount % step !== 0) {
@@ -1145,9 +1459,10 @@ function deletePaymongoAmountLink(amount) {
   }
 
   const store = readStore();
-  const current = normalizePaymongoCheckoutLinks(store.meta.paymongoCheckoutLinks);
+  const settings = getStoreSettings(store, storeId);
+  const current = normalizePaymongoCheckoutLinks(settings.paymongoCheckoutLinks);
   delete current.links[String(numericAmount)];
-  store.meta.paymongoCheckoutLinks = current;
+  settings.paymongoCheckoutLinks = current;
   writeStore(store);
   return current;
 }
@@ -1156,6 +1471,21 @@ function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
   return { salt, hash };
+}
+
+function toStoreManagerPublic(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: Number(user.id),
+    storeId: normalizeStoreId(user.storeId, 1),
+    email: String(user.email || "").trim().toLowerCase(),
+    fullName: String(user.fullName || "").trim(),
+    status: String(user.status || "ACTIVE").trim().toUpperCase(),
+    createdAt: user.createdAt || null,
+  };
 }
 
 function toBuyerPublic(user) {
@@ -1182,6 +1512,16 @@ function getBuyerByEmail(email) {
   return store.users.find((user) => String(user.email || "").toLowerCase() === normalizedEmail) || null;
 }
 
+function getStoreManagerByEmail(email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const store = readStore();
+  return store.storeManagers.find((user) => String(user.email || "").toLowerCase() === normalizedEmail) || null;
+}
+
 function getBuyerPublicById(userId) {
   const numericId = Number(userId);
   if (!Number.isInteger(numericId) || numericId < 1) {
@@ -1191,6 +1531,17 @@ function getBuyerPublicById(userId) {
   const store = readStore();
   const user = store.users.find((entry) => Number(entry.id) === numericId);
   return toBuyerPublic(user);
+}
+
+function getStoreManagerPublicById(userId) {
+  const numericId = Number(userId);
+  if (!Number.isInteger(numericId) || numericId < 1) {
+    return null;
+  }
+
+  const store = readStore();
+  const user = store.storeManagers.find((entry) => Number(entry.id) === numericId);
+  return toStoreManagerPublic(user);
 }
 
 function verifyPassword(user, password) {
@@ -1230,6 +1581,19 @@ function authenticateBuyerAccount(email, password) {
   return toBuyerPublic(user);
 }
 
+function authenticateStoreManager(email, password) {
+  const user = getStoreManagerByEmail(email);
+  if (!user || String(user.status || "").toUpperCase() !== "ACTIVE") {
+    return null;
+  }
+
+  if (!verifyPassword(user, password)) {
+    return null;
+  }
+
+  return toStoreManagerPublic(user);
+}
+
 function createBuyerAccount(payload) {
   const store = readStore();
   const email = String(payload.email || "").trim().toLowerCase();
@@ -1265,15 +1629,58 @@ function createBuyerAccount(payload) {
   return toBuyerPublic(user);
 }
 
+function createStoreManager(payload) {
+  const store = readStore();
+  const storeId = normalizeStoreId(payload.storeId, getDefaultStoreId(store));
+  const targetStore = store.stores.find((entry) => Number(entry.id) === storeId);
+  if (!targetStore) {
+    throw new Error("Store not found.");
+  }
+
+  const email = String(payload.email || "").trim().toLowerCase();
+  if (!email) {
+    throw new Error("Store manager email is required.");
+  }
+
+  const existing = store.storeManagers.find((user) => String(user.email || "").toLowerCase() === email);
+  if (existing) {
+    throw new Error("A store manager with this email already exists.");
+  }
+
+  const password = String(payload.password || "");
+  if (password.length < 8) {
+    throw new Error("Store manager password must be at least 8 characters.");
+  }
+
+  const { salt, hash } = hashPassword(password);
+  const manager = {
+    id: store.meta.nextStoreManagerId,
+    storeId,
+    email,
+    fullName: String(payload.fullName || "").trim(),
+    passwordSalt: salt,
+    passwordHash: hash,
+    createdAt: new Date().toISOString(),
+    status: "ACTIVE",
+  };
+
+  store.meta.nextStoreManagerId += 1;
+  store.storeManagers.push(manager);
+  targetStore.managerUserId = manager.id;
+  writeStore(store);
+  return toStoreManagerPublic(manager);
+}
+
 function createOrder(payload) {
   const store = readStore();
+  const storeId = normalizeStoreId(payload.storeId, getDefaultStoreId(store));
 
   if (!Array.isArray(payload.items) || payload.items.length === 0) {
     throw new Error("Cart is empty.");
   }
 
   const orderItems = payload.items.map((requestedItem) => {
-    const product = store.items.find((item) => item.id === requestedItem.itemId);
+    const product = store.items.find((item) => item.id === requestedItem.itemId && normalizeStoreId(item.storeId, storeId) === storeId);
 
     if (!product) {
       throw new Error(`Item ${requestedItem.itemId} not found.`);
@@ -1329,6 +1736,7 @@ function createOrder(payload) {
 
   const order = {
     id: store.meta.nextOrderId,
+    storeId,
     buyerName: payload.buyerName,
     buyerEmail: payload.buyerEmail,
     buyerPhone: payload.buyerPhone,
@@ -1371,12 +1779,20 @@ function createOrder(payload) {
 }
 
 function approveOrder(orderId) {
-  return updateOrderStatus(orderId, ORDER_STATUSES.PAID);
+  return updateOrderStatus(orderId, ORDER_STATUSES.PAID, arguments.length > 1 ? arguments[1] : null);
 }
 
-function updateOrderStatus(orderId, nextStatus) {
+function updateOrderStatus(orderId, nextStatus, storeId = null) {
   const store = readStore();
-  const order = store.orders.find((entry) => entry.id === Number(orderId));
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (!order) {
     throw new Error("Order not found.");
@@ -1407,7 +1823,7 @@ function updateOrderStatus(orderId, nextStatus) {
 
   if (currentStatus === ORDER_STATUSES.PENDING && targetStatus === ORDER_STATUSES.PAID) {
     for (const requestedItem of order.items) {
-      const product = store.items.find((item) => item.id === requestedItem.itemId);
+      const product = store.items.find((item) => item.id === requestedItem.itemId && normalizeStoreId(item.storeId, order.storeId) === normalizeStoreId(order.storeId));
 
       if (!product) {
         throw new Error(`Item ${requestedItem.itemId} no longer exists.`);
@@ -1419,7 +1835,7 @@ function updateOrderStatus(orderId, nextStatus) {
     }
 
     for (const requestedItem of order.items) {
-      const product = store.items.find((item) => item.id === requestedItem.itemId);
+      const product = store.items.find((item) => item.id === requestedItem.itemId && normalizeStoreId(item.storeId, order.storeId) === normalizeStoreId(order.storeId));
       product.stock -= requestedItem.quantity;
     }
   }
@@ -1444,9 +1860,17 @@ function updateOrderStatus(orderId, nextStatus) {
   return order;
 }
 
-function archiveOrder(orderId) {
+function archiveOrder(orderId, storeId = null) {
   const store = readStore();
-  const order = store.orders.find((entry) => entry.id === Number(orderId));
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (!order) {
     throw new Error("Order not found.");
@@ -1462,9 +1886,17 @@ function archiveOrder(orderId) {
   return order;
 }
 
-function unarchiveOrder(orderId) {
+function unarchiveOrder(orderId, storeId = null) {
   const store = readStore();
-  const order = store.orders.find((entry) => entry.id === Number(orderId));
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (!order) {
     throw new Error("Order not found.");
@@ -1480,9 +1912,17 @@ function unarchiveOrder(orderId) {
   return order;
 }
 
-function deleteOrder(orderId) {
+function deleteOrder(orderId, storeId = null) {
   const store = readStore();
-  const index = store.orders.findIndex((entry) => entry.id === Number(orderId));
+  const index = store.orders.findIndex((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (index === -1) {
     throw new Error("Order not found.");
@@ -1499,7 +1939,7 @@ function deleteOrder(orderId) {
 
   if (shouldRestoreStock) {
     for (const requestedItem of order.items || []) {
-      const product = store.items.find((item) => item.id === requestedItem.itemId);
+      const product = store.items.find((item) => item.id === requestedItem.itemId && normalizeStoreId(item.storeId, order.storeId) === normalizeStoreId(order.storeId));
       if (product) {
         product.stock += Number(requestedItem.quantity) || 0;
       }
@@ -1511,9 +1951,17 @@ function deleteOrder(orderId) {
   return order;
 }
 
-function markOrderEmailNotified(orderId) {
+function markOrderEmailNotified(orderId, storeId = null) {
   const store = readStore();
-  const order = store.orders.find((entry) => entry.id === Number(orderId));
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (!order) {
     return;
@@ -1523,9 +1971,17 @@ function markOrderEmailNotified(orderId) {
   writeStore(store);
 }
 
-function markOrderPendingReminderNotified(orderId) {
+function markOrderPendingReminderNotified(orderId, storeId = null) {
   const store = readStore();
-  const order = store.orders.find((entry) => entry.id === Number(orderId));
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
 
   if (!order) {
     return;
@@ -1547,6 +2003,10 @@ module.exports = {
   DEFAULT_FACEBOOK_AUTO_POST,
   DEFAULT_PAYMONGO_CHECKOUT_LINKS,
   ITEM_CATEGORIES,
+  getStores,
+  getStoreById,
+  getStoreBySlug,
+  createStore,
   ensureDataFile,
   getItems,
   createItem,
@@ -1564,6 +2024,9 @@ module.exports = {
   normalizeSmtpSettings,
   authenticateBuyerAccount,
   getBuyerPublicById,
+  authenticateStoreManager,
+  getStoreManagerPublicById,
+  createStoreManager,
   getFacebookAutoPostConfig,
   saveFacebookAutoPostConfig,
   setFacebookAutoPostLastResult,
