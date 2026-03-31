@@ -321,6 +321,14 @@
           <input id="new-item-photo" name="productImage" type="file" accept="image/*" />
           <p class="muted">Upload a photo or paste an image URL.</p>
         </div>
+        <div>
+          <label for="new-item-image-process-mode">Photo Cleanup</label>
+          <select id="new-item-image-process-mode" name="imageProcessMode">
+            <option value="ORIGINAL">Keep Original</option>
+            <option value="REMOVE_BACKGROUND">Remove Background</option>
+            <option value="CLEAN_WHITE">Clean White Background</option>
+          </select>
+        </div>
         <div class="inventory-grid-span">
           <label for="new-item-description">Description</label>
           <textarea id="new-item-description" name="description" rows="2" required></textarea>
@@ -387,6 +395,14 @@
               <label for="inv-photo-<%= item.id %>">Upload New Photo</label>
               <input id="inv-photo-<%= item.id %>" name="productImage" type="file" accept="image/*" />
               <p class="muted">Leave blank to keep the current photo.</p>
+            </div>
+            <div>
+              <label for="inv-image-process-mode-<%= item.id %>">Photo Cleanup</label>
+              <select id="inv-image-process-mode-<%= item.id %>" name="imageProcessMode">
+                <option value="ORIGINAL">Keep Original</option>
+                <option value="REMOVE_BACKGROUND">Remove Background</option>
+                <option value="CLEAN_WHITE">Clean White Background</option>
+              </select>
             </div>
             <div class="inventory-grid-span">
               <label for="inv-description-<%= item.id %>">Description</label>

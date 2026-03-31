@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
+const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
@@ -64,6 +65,11 @@ const publicHostLabel = host === "0.0.0.0" ? "localhost" : host;
 const UPLOAD_STORAGE_PROVIDERS = Object.freeze({
   LOCAL: "LOCAL",
   SUPABASE: "SUPABASE",
+});
+const IMAGE_PROCESS_MODES = Object.freeze({
+  ORIGINAL: "ORIGINAL",
+  CLEAN_WHITE: "CLEAN_WHITE",
+  REMOVE_BACKGROUND: "REMOVE_BACKGROUND",
 });
 const requestedUploadStorageProvider = String(
   process.env.UPLOAD_STORAGE_PROVIDER || (ACTIVE_STORAGE_PROVIDER === "SUPABASE" ? "SUPABASE" : "LOCAL")
@@ -470,9 +476,122 @@ function inferMimeTypeFromFilename(filename) {
   return map[ext] || "";
 }
 
-async function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "" }) {
+function normalizeImageProcessMode(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(IMAGE_PROCESS_MODES, normalized)) {
+    return IMAGE_PROCESS_MODES[normalized];
+  }
+  return IMAGE_PROCESS_MODES.ORIGINAL;
+}
+
+function sampleBackgroundColor(pixelBuffer, info) {
+  const sampleRadius = Math.max(2, Math.min(12, Math.floor(Math.min(info.width, info.height) / 12) || 2));
+  const corners = [
+    { startX: 0, endX: sampleRadius, startY: 0, endY: sampleRadius },
+    { startX: Math.max(0, info.width - sampleRadius), endX: info.width, startY: 0, endY: sampleRadius },
+    { startX: 0, endX: sampleRadius, startY: Math.max(0, info.height - sampleRadius), endY: info.height },
+    { startX: Math.max(0, info.width - sampleRadius), endX: info.width, startY: Math.max(0, info.height - sampleRadius), endY: info.height },
+  ];
+  const totals = { r: 0, g: 0, b: 0, count: 0 };
+
+  corners.forEach((corner) => {
+    for (let y = corner.startY; y < corner.endY; y += 1) {
+      for (let x = corner.startX; x < corner.endX; x += 1) {
+        const idx = (y * info.width + x) * info.channels;
+        const alpha = pixelBuffer[idx + 3];
+        if (alpha < 24) {
+          continue;
+        }
+        totals.r += pixelBuffer[idx];
+        totals.g += pixelBuffer[idx + 1];
+        totals.b += pixelBuffer[idx + 2];
+        totals.count += 1;
+      }
+    }
+  });
+
+  if (!totals.count) {
+    return { r: 245, g: 245, b: 245 };
+  }
+
+  return {
+    r: Math.round(totals.r / totals.count),
+    g: Math.round(totals.g / totals.count),
+    b: Math.round(totals.b / totals.count),
+  };
+}
+
+function removeBackgroundFromRawPixels(pixelBuffer, info) {
+  const output = Buffer.from(pixelBuffer);
+  const background = sampleBackgroundColor(output, info);
+  const threshold = 42;
+  const fadeRange = 92;
+
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const idx = (y * info.width + x) * info.channels;
+      const red = output[idx];
+      const green = output[idx + 1];
+      const blue = output[idx + 2];
+      const currentAlpha = output[idx + 3];
+      const distance = Math.sqrt(
+        ((red - background.r) ** 2) +
+        ((green - background.g) ** 2) +
+        ((blue - background.b) ** 2)
+      );
+
+      if (distance <= threshold) {
+        output[idx + 3] = 0;
+        continue;
+      }
+
+      if (distance < fadeRange) {
+        const normalized = (distance - threshold) / (fadeRange - threshold);
+        output[idx + 3] = Math.max(0, Math.min(255, Math.round(currentAlpha * normalized)));
+      }
+    }
+  }
+
+  return output;
+}
+
+async function processItemUploadImage(file, imageProcessMode) {
+  const mode = normalizeImageProcessMode(imageProcessMode);
+  if (!file || !file.buffer || mode === IMAGE_PROCESS_MODES.ORIGINAL) {
+    return file;
+  }
+
+  const input = sharp(file.buffer, { failOn: "none" }).rotate().ensureAlpha();
+  const { data, info } = await input.raw().toBuffer({ resolveWithObject: true });
+  const processedRaw = removeBackgroundFromRawPixels(data, info);
+
+  let pipeline = sharp(processedRaw, {
+    raw: {
+      width: info.width,
+      height: info.height,
+      channels: info.channels,
+    },
+  });
+
+  if (mode === IMAGE_PROCESS_MODES.CLEAN_WHITE) {
+    pipeline = pipeline.flatten({ background: { r: 250, g: 248, b: 244 } });
+  }
+
+  const outputBuffer = await pipeline.png().toBuffer();
+  const originalBaseName = String((file.originalname || "upload").replace(/\.[^.]+$/, "")).replace(/[^a-z0-9_-]/gi, "-") || "upload";
+
+  return {
+    ...file,
+    buffer: outputBuffer,
+    originalname: `${originalBaseName}.png`,
+    mimetype: "image/png",
+  };
+}
+
+async function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "", imageProcessMode = "" }) {
   if (file) {
-    return storeUploadedFile({ file, folder: "items" });
+    const nextFile = await processItemUploadImage(file, imageProcessMode);
+    return storeUploadedFile({ file: nextFile, folder: "items" });
   }
 
   const typedImageUrl = String(imageUrl || "").trim();
@@ -1844,6 +1963,7 @@ app.post("/admin/items/create", requireAdmin, upload.single("productImage"), asy
       imageUrl: await resolveItemImageInput({
         file: req.file,
         imageUrl: req.body.imageUrl,
+        imageProcessMode: req.body.imageProcessMode,
       }),
       paymongoLink: req.body.paymongoLink,
     });
@@ -1873,6 +1993,7 @@ app.post("/admin/items/:id/inventory", requireAdmin, upload.single("productImage
         file: req.file,
         imageUrl: req.body.imageUrl,
         fallbackImageUrl: req.body.currentImageUrl,
+        imageProcessMode: req.body.imageProcessMode,
       }),
     });
 
