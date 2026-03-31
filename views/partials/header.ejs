@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= title %></title>
+    <% if (typeof meta !== "undefined" && meta) { %>
+      <% if (meta.description) { %><meta name="description" content="<%= meta.description %>" /><% } %>
+      <% if (meta.canonicalUrl) { %><link rel="canonical" href="<%= meta.canonicalUrl %>" /><% } %>
+      <% if (meta.ogTitle || title) { %><meta property="og:title" content="<%= meta.ogTitle || title %>" /><% } %>
+      <% if (meta.ogDescription || meta.description) { %><meta property="og:description" content="<%= meta.ogDescription || meta.description %>" /><% } %>
+      <% if (meta.ogType) { %><meta property="og:type" content="<%= meta.ogType %>" /><% } %>
+      <% if (meta.ogUrl || meta.canonicalUrl) { %><meta property="og:url" content="<%= meta.ogUrl || meta.canonicalUrl %>" /><% } %>
+      <% if (meta.ogImage) { %><meta property="og:image" content="<%= meta.ogImage %>" /><% } %>
+      <% if (meta.twitterCard) { %><meta name="twitter:card" content="<%= meta.twitterCard %>" /><% } %>
+      <% if (meta.ogTitle || title) { %><meta name="twitter:title" content="<%= meta.ogTitle || title %>" /><% } %>
+      <% if (meta.ogDescription || meta.description) { %><meta name="twitter:description" content="<%= meta.ogDescription || meta.description %>" /><% } %>
+      <% if (meta.ogImage) { %><meta name="twitter:image" content="<%= meta.ogImage %>" /><% } %>
+    <% } %>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

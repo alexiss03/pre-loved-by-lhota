@@ -422,6 +422,42 @@ function isValidHttpUrl(value) {
   }
 }
 
+function toAbsoluteUrl(baseUrl, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  if (isValidHttpUrl(text)) {
+    return text;
+  }
+
+  const normalizedBaseUrl = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (!normalizedBaseUrl) {
+    return text;
+  }
+
+  return `${normalizedBaseUrl}/${text.replace(/^\/+/, "")}`;
+}
+
+function buildProductShareMeta(item, baseUrl) {
+  const name = String((item && item.name) || "Pre-loved by Lhota").trim();
+  const description = String((item && item.description) || "").trim() || "Curated preloved pieces from Pre-loved by Lhota.";
+  const url = `${String(baseUrl || "").replace(/\/+$/, "")}/product/${encodeURIComponent(String(item && item.id || ""))}`;
+  const image = toAbsoluteUrl(baseUrl, item && item.imageUrl);
+
+  return {
+    description,
+    canonicalUrl: url,
+    ogType: "product",
+    ogTitle: `${name} | Pre-loved by Lhota`,
+    ogDescription: description,
+    ogUrl: url,
+    ogImage: image,
+    twitterCard: image ? "summary_large_image" : "summary",
+  };
+}
+
 function inferMimeTypeFromFilename(filename) {
   const ext = String(path.extname(String(filename || "")).toLowerCase());
   const map = {
@@ -1089,11 +1125,13 @@ app.get("/product/:itemId", (req, res) => {
   const relatedItems = items
     .filter((entry) => entry.id !== item.id && entry.category === item.category)
     .slice(0, 4);
+  const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
 
   res.render("product-detail", {
     item,
     relatedItems,
-    baseUrl: process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`,
+    baseUrl,
+    meta: buildProductShareMeta(item, baseUrl),
     error: String(req.query.error || ""),
     allItemsJson: JSON.stringify(items),
   });
