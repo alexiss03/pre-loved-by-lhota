@@ -20,7 +20,9 @@ const {
   getStoreById,
   getStoreBySlug,
   createStore,
+  saveStoreTheme,
   getItems,
+  getLiveSellingItems,
   createItem,
   updateItemInventory,
   setItemBlocked,
@@ -44,6 +46,7 @@ const {
   createOrder,
   updateItemPaymongoLink,
   updateItemName,
+  updateItemLiveSelling,
   approveOrder,
   updateOrderStatus,
   archiveOrder,
@@ -51,6 +54,7 @@ const {
   deleteOrder,
   markOrderEmailNotified,
   markOrderPendingReminderNotified,
+  DEFAULT_STORE_THEME_KEY,
 } = require("./db");
 const {
   formatOrderStatus,
@@ -78,6 +82,33 @@ const IMAGE_PROCESS_MODES = Object.freeze({
   CLEAN_WHITE: "CLEAN_WHITE",
   REMOVE_BACKGROUND: "REMOVE_BACKGROUND",
 });
+const STORE_THEMES = Object.freeze([
+  {
+    key: "cordoba",
+    name: "Cordoba",
+    description: "Soft editorial neutrals with a warm boutique feel.",
+  },
+  {
+    key: "atelier",
+    name: "Atelier",
+    description: "Clean black-and-ivory retail styling for modern catalogs.",
+  },
+  {
+    key: "blush",
+    name: "Blush Maison",
+    description: "Feminine blush tones for fashion-forward preloved pieces.",
+  },
+  {
+    key: "sage",
+    name: "Sage Market",
+    description: "Fresh green-gray tones for home goods and mixed inventory.",
+  },
+  {
+    key: "cocadim",
+    name: "Cocadim",
+    description: "Airy cream-and-taupe merchandising inspired by polished online catalogs.",
+  },
+]);
 const requestedUploadStorageProvider = String(
   process.env.UPLOAD_STORAGE_PROVIDER || (ACTIVE_STORAGE_PROVIDER === "SUPABASE" ? "SUPABASE" : "LOCAL")
 )
@@ -342,11 +373,14 @@ function buildStoreCartKey(store) {
 
 function getStoreRenderContext(store) {
   const activeStore = store || getPlatformDefaultStore();
+  const rawThemeKey = activeStore && activeStore.settings ? activeStore.settings.themeKey : DEFAULT_STORE_THEME_KEY;
+  const themeKey = STORE_THEMES.some((theme) => theme.key === rawThemeKey) ? rawThemeKey : DEFAULT_STORE_THEME_KEY;
   return {
     activeStore,
     storeName: activeStore ? activeStore.name : "Pre-loved by Lhota",
     storeBasePath: activeStore ? buildStoreBasePath(activeStore) : "",
     storeCartKey: activeStore ? buildStoreCartKey(activeStore) : "preloved_cart",
+    storeThemeKey: themeKey,
   };
 }
 
@@ -453,6 +487,7 @@ async function renderOperatorDashboard(req, res) {
   const items = getItems(currentStore.id);
   const analytics = buildAdminAnalytics({ orders, items });
   const inventoryItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+  const liveSellingItems = getLiveSellingItems(currentStore.id);
   const paymongoCheckout = getPaymongoCheckoutLinks(currentStore.id);
   const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
   const adminNotifications = getAdminNotificationSettings(currentStore.id);
@@ -472,6 +507,7 @@ async function renderOperatorDashboard(req, res) {
     ...getStoreRenderContext(currentStore),
     items,
     inventoryItems,
+    liveSellingItems,
     inventoryCategories: Object.values(ITEM_CATEGORIES),
     analytics,
     paymongoCheckout,
@@ -494,6 +530,7 @@ async function renderOperatorDashboard(req, res) {
     currentStore,
     stores,
     currentStoreManager: currentStore.managerUserId ? getStoreManagerPublicById(currentStore.managerUserId) : null,
+    availableStoreThemes: STORE_THEMES,
   });
 }
 
@@ -1475,6 +1512,18 @@ function redirectToStoreCategory(store, categoryKey) {
   return `${basePath}/shop?category=${encodeURIComponent(categoryKey)}`;
 }
 
+function renderStoreLiveSelling(req, res, store) {
+  const activeStore = getResolvedStore(store);
+  const liveItems = getLiveSellingItems(activeStore.id);
+  res.render(
+    "live-selling",
+    withStoreContext(activeStore, {
+      items: liveItems,
+      allItemsJson: JSON.stringify(liveItems),
+    })
+  );
+}
+
 app.get("/", (req, res) => {
   renderStoreHome(req, res, getPlatformDefaultStore());
 });
@@ -1604,6 +1653,10 @@ app.get("/logout", (req, res) => {
 
 app.get("/shop", (req, res) => {
   renderStoreShop(req, res, getPlatformDefaultStore());
+});
+
+app.get("/live-selling", (req, res) => {
+  renderStoreLiveSelling(req, res, getPlatformDefaultStore());
 });
 
 app.get("/shop/clothes", (_req, res) => {
@@ -1891,6 +1944,14 @@ app.get("/stores/:slug/shop", (req, res) => {
     return;
   }
   renderStoreShop(req, res, store);
+});
+
+app.get("/stores/:slug/live-selling", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  renderStoreLiveSelling(req, res, store);
 });
 
 app.get("/stores/:slug/shop/clothes", (req, res) => {
@@ -2652,6 +2713,9 @@ app.post("/admin/items/create", requireStoreOperator, upload.single("productImag
       category: req.body.category,
       price: req.body.price,
       stock: req.body.stock,
+      isLiveSelling: String(req.body.isLiveSelling || "") === "1",
+      liveSellingOrder: req.body.liveSellingOrder,
+      liveSellingLabel: req.body.liveSellingLabel,
       description: req.body.description,
       imageUrl: await resolveItemImageInput({
         file: req.file,
@@ -2685,6 +2749,9 @@ app.post("/admin/items/:id/inventory", requireStoreOperator, upload.single("prod
       category: req.body.category,
       price: req.body.price,
       stock: req.body.stock,
+      isLiveSelling: String(req.body.isLiveSelling || "") === "1",
+      liveSellingOrder: req.body.liveSellingOrder,
+      liveSellingLabel: req.body.liveSellingLabel,
       description: req.body.description,
       imageUrl: await resolveItemImageInput({
         file: req.file,
@@ -2725,6 +2792,59 @@ app.post("/admin/items/:id/block", requireStoreOperator, (req, res) => {
     res.redirect(buildOperatorRedirect(req, {
       tab: "inventory",
       error: error.message || "Failed to update block status.",
+      storeId: getOperatorStoreId(req),
+    }));
+  }
+});
+
+app.post("/admin/items/:id/live-selling", requireStoreOperator, (req, res) => {
+  try {
+    const storeId = getOperatorStoreId(req);
+    const itemId = String(req.params.id || "");
+    const item = updateItemLiveSelling(
+      itemId,
+      {
+        isLiveSelling: String(req.body.isLiveSelling || "") === "1",
+        liveSellingOrder: req.body.liveSellingOrder,
+        liveSellingLabel: req.body.liveSellingLabel,
+      },
+      storeId
+    );
+
+    const label = item.isLiveSelling ? "added to" : "removed from";
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "live-selling",
+      message: `${item.name} ${label} live selling.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "live-selling",
+      error: error.message || "Failed to update live-selling settings.",
+      storeId: getOperatorStoreId(req),
+    }));
+  }
+});
+
+app.post("/admin/store-theme", requireStoreOperator, (req, res) => {
+  try {
+    const storeId = getOperatorStoreId(req);
+    const requestedThemeKey = String(req.body.themeKey || "").trim().toLowerCase();
+    const theme = STORE_THEMES.find((entry) => entry.key === requestedThemeKey);
+    if (!theme) {
+      throw new Error("Select a valid store theme.");
+    }
+
+    saveStoreTheme(theme.key, storeId);
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "appearance",
+      message: `${theme.name} theme applied.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "appearance",
+      error: error.message || "Failed to save store theme.",
       storeId: getOperatorStoreId(req),
     }));
   }
