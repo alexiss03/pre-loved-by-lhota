@@ -361,6 +361,45 @@ async function sendNewOrderAdminEmail(adminEmail, order) {
   return true;
 }
 
+async function sendCompletedOrderAdminEmail(adminEmail, order) {
+  const transport = getTransport();
+
+  if (!transport || !adminEmail) {
+    return false;
+  }
+
+  const from = getFromAddress(getResolvedSmtpConfig());
+
+  await transport.sendMail({
+    from,
+    to: adminEmail,
+    subject: `Order completed: #${order.id}`,
+    text: [
+      "An order has been marked as received/completed.",
+      "",
+      `Order ID: #${order.id}`,
+      `Buyer: ${order.buyerName}`,
+      `Email: ${order.buyerEmail}`,
+      `Phone: ${order.buyerPhone}`,
+      `Delivery Address: ${order.deliveryAddress}`,
+      `Delivery Area: ${formatDeliveryArea(order.deliveryArea)}`,
+      `Received At: ${order.receivedAt || "-"}`,
+      `Delivery Fee: PHP ${(order.deliveryFee || 0).toFixed(2)}`,
+      `Items Subtotal: PHP ${(order.itemSubtotal || order.totalAmount || 0).toFixed(2)}`,
+      `Grand Total: PHP ${(order.grandTotal || order.totalAmount || 0).toFixed(2)}`,
+      "",
+      "Items:",
+      ...order.items.map(
+        (item) => `- ${item.name} x${item.quantity} = PHP ${item.subtotal.toFixed(2)}`
+      ),
+      "",
+      "You can review the completed order in Admin > Orders > Received.",
+    ].join("\n"),
+  });
+
+  return true;
+}
+
 async function sendUnprocessedOrderReminderEmail(adminEmail, order, ageHours) {
   const transport = getTransport();
 
@@ -397,5 +436,6 @@ module.exports = {
   sendApprovedOrderEmail,
   sendOrderStatusUpdateEmail,
   sendNewOrderAdminEmail,
+  sendCompletedOrderAdminEmail,
   sendUnprocessedOrderReminderEmail,
 };

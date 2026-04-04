@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: `${storeName || "Pre-loved by Lhota"} Shop`, storeBasePath, storeName, storeCartKey }) %>
+<%- include('partials/header', { title: `${storeName || "Pre-loved by Lhota"} Shop`, storeBasePath, storeName, storeCartKey, storeThemeKey }) %>
 
 <%
   const clothes = items.filter((item) => item.category === "Clothes");
@@ -6,97 +6,332 @@
   const miscellaneous = items.filter(
     (item) => item.category === "Miscellaneous" || item.category === "Utensils"
   );
+  const isCocadimLayout = String(storeThemeKey || "").toLowerCase() === "cocadim";
+  const isPristieLayout = String(storeThemeKey || "").toLowerCase() === "pristie";
+  const isLuxeLayout = String(storeThemeKey || "").toLowerCase() === "luxe";
   const heroLeftItem = clothes[0] || items[0];
   const heroRightItem = bags[0] || items[1] || heroLeftItem;
   const showcaseItem = miscellaneous[0] || items[2] || heroLeftItem;
   const quickPicks = items.slice(0, 4);
   const feedSeedItems = items.slice(0, Math.min(items.length, 8));
+  const cocadimFeatured = items.slice(0, 4);
+  const cocadimSoftEdit = items.slice(4, 7).length > 0 ? items.slice(4, 7) : items.slice(0, 3);
+  const pristieFeatured = items.slice(0, 6);
+  const pristieSoftEdit = items.slice(6, 9).length > 0 ? items.slice(6, 9) : items.slice(0, 3);
+  const luxeFeatureCards = items.slice(0, 3);
+  const luxeProductStrip = items.slice(0, 5);
 %>
 
-<section class="cordoba-hero">
-  <div class="hero-layer hero-layer-left">
-    <img src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1000&q=80' %>" alt="New arrivals left" />
-  </div>
-  <div class="hero-layer hero-layer-right">
-    <img src="<%= heroRightItem ? heroRightItem.imageUrl : 'https://images.unsplash.com/photo-1503342452485-86ff0a6f57ef?auto=format&fit=crop&w=1000&q=80' %>" alt="New arrivals right" />
-  </div>
-  <div class="hero-card">
-    <p class="hero-label">New Collection</p>
-    <h1>NEW ARRIVALS</h1>
-    <p>Explore our newest preloved pieces for your everyday look.</p>
-    <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
-  </div>
-</section>
+<% if (isLuxeLayout) { %>
+  <section class="luxe-hero">
+    <img class="luxe-hero-image" src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=1600&q=80' %>" alt="Luxe hero" />
+    <div class="luxe-hero-overlay">
+      <p class="hero-label">Soft Collection</p>
+      <h1>Luxurious comfort</h1>
+      <p>Effortless preloved essentials with a quieter editorial presentation.</p>
+      <a class="button luxe-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+    </div>
+  </section>
 
-<section class="cordoba-feature-band">
-  <div class="feature-band-image">
-    <img src="<%= showcaseItem ? showcaseItem.imageUrl : 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1100&q=80' %>" alt="Best sellers section" />
-  </div>
-  <div class="feature-band-copy">
-    <h2>Our best sellers are back in stock</h2>
-    <p>Discover handpicked favorites before they sell out again.</p>
-    <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
-  </div>
-</section>
+  <section class="luxe-landed">
+    <div class="luxe-landed-copy">
+      <h2>Just Landed</h2>
+      <p>Discover the latest additions to your best-selling collection and spotlight your softest pieces first.</p>
+      <a class="button luxe-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+    </div>
+    <div class="luxe-feature-grid">
+      <% luxeFeatureCards.forEach((item) => { %>
+        <article class="luxe-feature-card">
+          <a href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+            <span><%= item.name %></span>
+          </a>
+        </article>
+      <% }) %>
+    </div>
+  </section>
 
-<section class="catalog-section" id="new-arrivals">
-  <span class="anchor-target" id="clothes"></span>
-  <span class="anchor-target" id="bags"></span>
-  <span class="anchor-target" id="miscellaneous"></span>
-  <div class="section-head section-center">
-    <h2>Quick Picks</h2>
-  </div>
-  <div class="item-grid">
-    <% quickPicks.forEach((item) => { %>
-      <article class="item-card">
-        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
-          <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
-        </a>
-        <div class="item-card-body">
-          <span class="item-category"><%= item.category %></span>
-          <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
-          <p class="item-description"><%= item.description %></p>
-          <p class="stock-text"><%= item.stock %> pieces available</p>
-          <p class="price"><%= formatCurrency(item.price) %></p>
-          <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
-            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
-          </button>
-          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
-        </div>
-      </article>
-    <% }) %>
-  </div>
-</section>
+  <section class="luxe-promo-grid">
+    <article class="luxe-promo-card">
+      <img src="<%= heroRightItem ? heroRightItem.imageUrl : 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80' %>" alt="New arrivals" />
+      <div class="luxe-promo-copy">
+        <h2>New Arrivals</h2>
+        <a class="button luxe-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+      </div>
+    </article>
+    <article class="luxe-promo-card">
+      <img src="<%= showcaseItem ? showcaseItem.imageUrl : 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80' %>" alt="Best sellers" />
+      <div class="luxe-promo-copy">
+        <h2>Best Sellers</h2>
+        <a class="button luxe-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+      </div>
+    </article>
+  </section>
 
-<section class="catalog-section light-panel endless-feed-section">
-  <div
-    class="item-grid"
-    id="endless-feed-grid"
-    data-feed-cursor="<%= feedSeedItems.length %>"
-    data-batch-size="4"
-  >
-    <% feedSeedItems.forEach((item) => { %>
-      <article class="item-card">
-        <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
-          <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
-        </a>
-        <div class="item-card-body">
-          <span class="item-category"><%= item.category %></span>
-          <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
-          <p class="item-description"><%= item.description %></p>
-          <p class="stock-text"><%= item.stock %> pieces available</p>
-          <p class="price"><%= formatCurrency(item.price) %></p>
-          <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
-            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
-          </button>
-          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
-        </div>
-      </article>
-    <% }) %>
-  </div>
+  <section class="catalog-section luxe-products">
+    <div class="item-grid luxe-product-grid">
+      <% luxeProductStrip.forEach((item) => { %>
+        <article class="item-card luxe-product-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+            <a class="luxe-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View options</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
 
-  <div id="endless-feed-sentinel" class="endless-feed-sentinel" aria-hidden="true">Loading more items...</div>
-</section>
+  <section class="luxe-banner">
+    <img src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1600&q=80' %>" alt="Luxe banner" />
+    <div class="luxe-banner-copy">
+      <h2>Luxurious comfort made for everyday living.</h2>
+    </div>
+  </section>
+<% } else if (isCocadimLayout) { %>
+  <section class="cocadim-hero">
+    <div class="cocadim-hero-copy">
+      <p class="hero-label">New Pieces</p>
+      <h1>Soft style for everyday wear.</h1>
+      <p>Curated preloved clothes, bags, and special finds styled like a polished online boutique.</p>
+      <a class="button peach-button" href="<%= storeBasePath %>/shop">Find Your Piece</a>
+    </div>
+    <div class="cocadim-hero-media">
+      <img src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1503342452485-86ff0a6f57ef?auto=format&fit=crop&w=1200&q=80' %>" alt="Cocadim featured item" />
+    </div>
+  </section>
+
+  <section class="cocadim-feature-strip">
+    <article class="cocadim-feature">
+      <h3>Preloved Favorites</h3>
+      <p>Handpicked looks and essentials with a cleaner, more boutique presentation.</p>
+    </article>
+    <article class="cocadim-feature">
+      <h3>Fresh Weekly Drops</h3>
+      <p>New items can be highlighted in a softer editorial layout that feels more like a store catalog.</p>
+    </article>
+    <article class="cocadim-feature">
+      <h3>Across Categories</h3>
+      <p>Clothes, bags, and miscellaneous finds are arranged in focused sections instead of one long feed.</p>
+    </article>
+  </section>
+
+  <section class="catalog-section cocadim-section">
+    <div class="section-head section-center cocadim-section-head">
+      <h2>Featured Finds</h2>
+      <p>A cleaner first row for your best pieces.</p>
+    </div>
+    <div class="item-grid cocadim-grid cocadim-grid-featured">
+      <% cocadimFeatured.forEach((item) => { %>
+        <article class="item-card cocadim-item-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <span class="item-category"><%= item.category %></span>
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="catalog-section cocadim-section cocadim-soft-panel">
+    <div class="section-head section-center cocadim-section-head">
+      <h2>Your Top Picks</h2>
+      <p>Lightweight, dressy, and everyday-ready.</p>
+    </div>
+    <div class="item-grid cocadim-grid cocadim-grid-soft">
+      <% cocadimSoftEdit.forEach((item) => { %>
+        <article class="item-card cocadim-item-card cocadim-soft-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="item-description"><%= item.description %></p>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="cocadim-footer-band">
+    <div>
+      <h2>Curated preloved pieces, presented like a boutique.</h2>
+      <p>Switch stores, keep the same system, and let each store have its own look and rhythm.</p>
+    </div>
+    <a class="button peach-button" href="<%= storeBasePath %>/shop">Browse Collection</a>
+  </section>
+<% } else if (isPristieLayout) { %>
+  <section class="pristie-hero">
+    <div class="pristie-hero-copy">
+      <p class="hero-label">New Pieces</p>
+      <h1>Soft style for everyday wear.</h1>
+      <p>Curated preloved clothes, bags, and special finds styled like a polished online boutique.</p>
+      <a class="button peach-button" href="<%= storeBasePath %>/shop">Find Your Piece</a>
+    </div>
+    <div class="pristie-hero-media">
+      <img src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1503342452485-86ff0a6f57ef?auto=format&fit=crop&w=1200&q=80' %>" alt="Pristie featured item" />
+    </div>
+  </section>
+
+  <section class="pristie-feature-strip">
+    <article class="pristie-feature">
+      <h3>Preloved Favorites</h3>
+      <p>Handpicked looks and essentials with a cleaner, more boutique presentation.</p>
+    </article>
+    <article class="pristie-feature">
+      <h3>Fresh Weekly Drops</h3>
+      <p>New items can be highlighted in a softer editorial layout that feels more like a store catalog.</p>
+    </article>
+    <article class="pristie-feature">
+      <h3>Across Categories</h3>
+      <p>Clothes, bags, and miscellaneous finds are arranged in focused sections instead of one long feed.</p>
+    </article>
+  </section>
+
+  <section class="catalog-section pristie-section">
+    <div class="section-head section-center pristie-section-head">
+      <h2>Featured Finds</h2>
+      <p>A cleaner gallery for your best pieces.</p>
+    </div>
+    <div class="item-grid pristie-grid pristie-grid-featured">
+      <% pristieFeatured.forEach((item) => { %>
+        <article class="item-card pristie-item-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <span class="item-category"><%= item.category %></span>
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="catalog-section pristie-section pristie-soft-panel">
+    <div class="section-head section-center pristie-section-head">
+      <h2>Styled Edit</h2>
+      <p>Smaller highlights for quick browsing.</p>
+    </div>
+    <div class="item-grid pristie-grid pristie-grid-mini">
+      <% pristieSoftEdit.forEach((item) => { %>
+        <article class="item-card pristie-item-card pristie-soft-card pristie-mini-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="pristie-footer-band">
+    <div>
+      <h2>Curated preloved pieces, presented like a boutique.</h2>
+      <p>Switch stores, keep the same system, and let each store have its own look and rhythm.</p>
+    </div>
+    <a class="button peach-button" href="<%= storeBasePath %>/shop">Browse Collection</a>
+  </section>
+<% } else { %>
+  <section class="cordoba-hero">
+    <div class="hero-layer hero-layer-left">
+      <img src="<%= heroLeftItem ? heroLeftItem.imageUrl : 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1000&q=80' %>" alt="New arrivals left" />
+    </div>
+    <div class="hero-layer hero-layer-right">
+      <img src="<%= heroRightItem ? heroRightItem.imageUrl : 'https://images.unsplash.com/photo-1503342452485-86ff0a6f57ef?auto=format&fit=crop&w=1000&q=80' %>" alt="New arrivals right" />
+    </div>
+    <div class="hero-card">
+      <p class="hero-label">New Collection</p>
+      <h1>NEW ARRIVALS</h1>
+      <p>Explore our newest preloved pieces for your everyday look.</p>
+      <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+    </div>
+  </section>
+
+  <section class="cordoba-feature-band">
+    <div class="feature-band-image">
+      <img src="<%= showcaseItem ? showcaseItem.imageUrl : 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1100&q=80' %>" alt="Best sellers section" />
+    </div>
+    <div class="feature-band-copy">
+      <h2>Our best sellers are back in stock</h2>
+      <p>Discover handpicked favorites before they sell out again.</p>
+      <a class="button peach-button" href="<%= storeBasePath %>/shop">Shop Now</a>
+    </div>
+  </section>
+
+  <section class="catalog-section" id="new-arrivals">
+    <span class="anchor-target" id="clothes"></span>
+    <span class="anchor-target" id="bags"></span>
+    <span class="anchor-target" id="miscellaneous"></span>
+    <div class="section-head section-center">
+      <h2>Quick Picks</h2>
+    </div>
+    <div class="item-grid">
+      <% quickPicks.forEach((item) => { %>
+        <article class="item-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <span class="item-category"><%= item.category %></span>
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="item-description"><%= item.description %></p>
+            <p class="stock-text"><%= item.stock %> pieces available</p>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+            <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
+              <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+            </button>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="catalog-section light-panel endless-feed-section">
+    <div
+      class="item-grid"
+      id="endless-feed-grid"
+      data-feed-cursor="<%= feedSeedItems.length %>"
+      data-batch-size="4"
+    >
+      <% feedSeedItems.forEach((item) => { %>
+        <article class="item-card">
+          <a class="item-image-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+            <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+          </a>
+          <div class="item-card-body">
+            <span class="item-category"><%= item.category %></span>
+            <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+            <p class="item-description"><%= item.description %></p>
+            <p class="stock-text"><%= item.stock %> pieces available</p>
+            <p class="price"><%= formatCurrency(item.price) %></p>
+            <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
+              <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+            </button>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+
+    <div id="endless-feed-sentinel" class="endless-feed-sentinel" aria-hidden="true">Loading more items...</div>
+  </section>
+<% } %>
 
 <div id="cart-modal" class="cart-modal" aria-hidden="true">
   <div class="cart-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cart-modal-title">

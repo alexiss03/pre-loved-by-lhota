@@ -1,0 +1,83 @@
+<%
+  const liveStoreName = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota";
+  const liveStoreBasePath = typeof storeBasePath === "string" && storeBasePath.trim() ? storeBasePath : "";
+  const liveStoreCartKey = typeof storeCartKey === "string" && storeCartKey.trim() ? storeCartKey : "preloved_cart";
+  const liveItems = Array.isArray(items) ? items : [];
+%>
+<%- include('partials/header', { title: `Live Selling - ${liveStoreName}`, storeBasePath: liveStoreBasePath, storeName: liveStoreName, storeCartKey: liveStoreCartKey, storeThemeKey }) %>
+
+<section class="section-head shop-head live-selling-head">
+  <p class="live-selling-kicker"><span class="live-dot"></span>Live Now</p>
+  <h1>Live Selling</h1>
+  <p>Shop the items currently lined up for live selling from <%= liveStoreName %>.</p>
+</section>
+
+<section class="card live-selling-hero">
+  <div>
+    <p class="hero-label">Live Lineup</p>
+    <h2>Ready for claiming during your live</h2>
+    <p class="muted">Use the live slot labels below when showing items on stream so buyers can mine them faster.</p>
+  </div>
+  <div class="live-selling-pill">Claim Fast • Limited Pieces</div>
+  <a class="button peach-button" href="<%= liveStoreBasePath %>/shop">Browse Full Store</a>
+</section>
+
+<section class="catalog-section">
+  <% if (liveItems.length === 0) { %>
+    <div class="card">
+      <p>No items have been added to the live-selling list yet.</p>
+    </div>
+  <% } %>
+
+  <div class="item-grid">
+    <% liveItems.forEach((item, index) => { %>
+      <article class="item-card live-selling-card" style="--live-card-index:<%= index %>;">
+        <a class="item-image-link" href="<%= liveStoreBasePath %>/product/<%= encodeURIComponent(item.id) %>">
+          <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+        </a>
+        <div class="item-card-body">
+          <span class="item-category"><%= item.category %></span>
+          <% if (item.liveSellingLabel) { %>
+            <p class="live-selling-slot">Live Slot: <strong><%= item.liveSellingLabel %></strong></p>
+          <% } else { %>
+            <p class="live-selling-slot">Live Order: <strong><%= item.liveSellingOrder || 9999 %></strong></p>
+          <% } %>
+          <h3><a class="item-title-link" href="<%= liveStoreBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
+          <p class="item-description"><%= item.description %></p>
+          <p class="stock-text"><%= item.stock %> pieces available</p>
+          <p class="price"><%= formatCurrency(item.price) %></p>
+          <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
+            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+          </button>
+          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<div id="cart-modal" class="cart-modal" aria-hidden="true">
+  <div class="cart-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cart-modal-title">
+    <button id="cart-modal-close" class="cart-modal-close" type="button" aria-label="Close confirmation">x</button>
+    <h3 id="cart-modal-title">Add to Cart</h3>
+    <p id="cart-modal-message">How many pieces would you like to add?</p>
+    <div class="cart-modal-pieces">
+      <label for="cart-modal-pieces-input">Pieces</label>
+      <input id="cart-modal-pieces-input" type="number" min="1" value="1" />
+    </div>
+    <div class="cart-modal-actions">
+      <button id="cart-modal-cancel" class="button button-secondary" type="button">Cancel</button>
+      <button id="cart-modal-confirm" class="button button-primary" type="button">Confirm Add</button>
+    </div>
+    <a class="button" href="<%= liveStoreBasePath %>/cart">Go to Cart</a>
+  </div>
+</div>
+
+<script>
+  window.ITEM_CATALOG = <%- allItemsJson %>;
+  window.STORE_BASE_PATH = <%- JSON.stringify(liveStoreBasePath) %>;
+  window.STORE_CART_KEY = <%- JSON.stringify(liveStoreCartKey) %>;
+</script>
+<script src="/js/storefront.js"></script>
+
+<%- include('partials/footer') %>

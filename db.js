@@ -48,6 +48,7 @@ const ORDER_STATUS_TRANSITIONS = Object.freeze({
 const DEFAULT_ADMIN_NOTIFICATION_SETTINGS = Object.freeze({
   enabled: true,
   newOrderEmail: "",
+  completedOrderEmail: "",
 });
 const DEFAULT_SMTP_SETTINGS = Object.freeze({
   host: "",
@@ -90,6 +91,7 @@ const DEFAULT_STORE_SUBSCRIPTION = Object.freeze({
   plan: "Starter",
   status: "ACTIVE",
 });
+const DEFAULT_STORE_THEME_KEY = "cordoba";
 
 function slugifyStoreName(value) {
   const text = String(value || "")
@@ -102,6 +104,7 @@ function slugifyStoreName(value) {
 
 function createStoreSettingsFromLegacyMeta(meta = {}) {
   return {
+    themeKey: String(meta.themeKey || DEFAULT_STORE_THEME_KEY).trim().toLowerCase() || DEFAULT_STORE_THEME_KEY,
     adminNotifications: { ...DEFAULT_ADMIN_NOTIFICATION_SETTINGS, ...(meta.adminNotifications || {}) },
     smtpSettings: { ...DEFAULT_SMTP_SETTINGS, ...(meta.smtpSettings || {}) },
     facebookAutoPost: { ...DEFAULT_FACEBOOK_AUTO_POST, ...(meta.facebookAutoPost || {}) },
@@ -452,6 +455,7 @@ function normalizeAdminNotificationSettings(settings) {
       ? Boolean(settings.enabled)
       : DEFAULT_ADMIN_NOTIFICATION_SETTINGS.enabled,
     newOrderEmail: String((settings && settings.newOrderEmail) || "").trim().toLowerCase(),
+    completedOrderEmail: String((settings && settings.completedOrderEmail) || "").trim().toLowerCase(),
   };
 }
 
@@ -611,6 +615,27 @@ function normalizeItems(store) {
       item.isBlocked = normalizedBlocked;
       hasChanges = true;
     }
+
+    const normalizedLiveSelling = Boolean(item.isLiveSelling);
+    if (item.isLiveSelling !== normalizedLiveSelling) {
+      item.isLiveSelling = normalizedLiveSelling;
+      hasChanges = true;
+    }
+
+    const normalizedLiveSellingOrder = Number(item.liveSellingOrder);
+    const nextLiveSellingOrder = Number.isInteger(normalizedLiveSellingOrder) && normalizedLiveSellingOrder > 0
+      ? normalizedLiveSellingOrder
+      : 9999;
+    if (item.liveSellingOrder !== nextLiveSellingOrder) {
+      item.liveSellingOrder = nextLiveSellingOrder;
+      hasChanges = true;
+    }
+
+    const normalizedLiveSellingLabel = String(item.liveSellingLabel || "").trim();
+    if (item.liveSellingLabel !== normalizedLiveSellingLabel) {
+      item.liveSellingLabel = normalizedLiveSellingLabel;
+      hasChanges = true;
+    }
   }
 
   return hasChanges;
@@ -698,6 +723,9 @@ function normalizeStoreStructure(store) {
 
     const currentSettings = entry && typeof entry.settings === "object" ? entry.settings : legacyStoreSettings;
     const normalizedSettings = {
+      themeKey:
+        String((currentSettings && currentSettings.themeKey) || DEFAULT_STORE_THEME_KEY).trim().toLowerCase() ||
+        DEFAULT_STORE_THEME_KEY,
       adminNotifications: normalizeAdminNotificationSettings(currentSettings.adminNotifications || {}),
       smtpSettings: normalizeSmtpSettings(currentSettings.smtpSettings || {}),
       facebookAutoPost: normalizeFacebookAutoPostConfig(currentSettings.facebookAutoPost || {}),
@@ -1095,6 +1123,15 @@ function getStoreSettings(store, storeId) {
   return targetStore.settings;
 }
 
+function saveStoreTheme(themeKey, storeId = null) {
+  const store = readStore();
+  const settings = getStoreSettings(store, storeId);
+  const normalizedThemeKey = String(themeKey || "").trim().toLowerCase() || DEFAULT_STORE_THEME_KEY;
+  settings.themeKey = normalizedThemeKey;
+  writeStore(store);
+  return settings.themeKey;
+}
+
 function createStore(payload) {
   const store = readStore();
   const name = String(payload.name || "").trim();
@@ -1217,6 +1254,22 @@ function generateNextItemId(store, category) {
   return `${prefix}${String(next).padStart(3, "0")}`;
 }
 
+function normalizeLiveSellingOrder(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 1) {
+    return 9999;
+  }
+  return Math.floor(numeric);
+}
+
+function normalizeLiveSellingLabel(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 50);
+}
+
+function normalizeLiveSellingFlag(value) {
+  return Boolean(value);
+}
+
 function createItem(payload) {
   const store = readStore();
   const storeId = normalizeStoreId(payload.storeId, getDefaultStoreId(store));
@@ -1235,6 +1288,9 @@ function createItem(payload) {
     description: normalizeItemDescription(payload.description),
     paymongoLink: String(payload.paymongoLink || "").trim(),
     isBlocked: false,
+    isLiveSelling: normalizeLiveSellingFlag(payload.isLiveSelling),
+    liveSellingOrder: normalizeLiveSellingOrder(payload.liveSellingOrder),
+    liveSellingLabel: normalizeLiveSellingLabel(payload.liveSellingLabel),
     imageUrl: normalizeItemImageUrl(payload.imageUrl),
   };
 
@@ -1265,6 +1321,9 @@ function updateItemInventory(itemId, payload) {
   item.price = normalizeItemPrice(payload.price);
   item.stock = normalizeItemStock(payload.stock);
   item.description = normalizeItemDescription(payload.description);
+  item.isLiveSelling = normalizeLiveSellingFlag(payload.isLiveSelling);
+  item.liveSellingOrder = normalizeLiveSellingOrder(payload.liveSellingOrder);
+  item.liveSellingLabel = normalizeLiveSellingLabel(payload.liveSellingLabel);
   item.imageUrl = normalizeItemImageUrl(payload.imageUrl);
   writeStore(store);
   return item;
@@ -1343,6 +1402,42 @@ function updateItemName(itemId, name) {
   item.name = normalizedName;
   writeStore(store);
   return item;
+}
+
+function updateItemLiveSelling(itemId, payload) {
+  const store = readStore();
+  const storeId = arguments.length > 2 ? normalizeStoreId(arguments[2], getDefaultStoreId(store)) : null;
+  const item = store.items.find((entry) => {
+    if (entry.id !== String(itemId || "")) {
+      return false;
+    }
+    if (storeId === null) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === storeId;
+  });
+
+  if (!item) {
+    throw new Error("Item not found.");
+  }
+
+  item.isLiveSelling = normalizeLiveSellingFlag(payload && payload.isLiveSelling);
+  item.liveSellingOrder = normalizeLiveSellingOrder(payload && payload.liveSellingOrder);
+  item.liveSellingLabel = normalizeLiveSellingLabel(payload && payload.liveSellingLabel);
+  writeStore(store);
+  return item;
+}
+
+function getLiveSellingItems(storeId = null) {
+  return getItems(storeId)
+    .filter((item) => item.isLiveSelling && !item.isBlocked)
+    .sort((a, b) => {
+      const byOrder = Number(a.liveSellingOrder || 9999) - Number(b.liveSellingOrder || 9999);
+      if (byOrder !== 0) {
+        return byOrder;
+      }
+      return a.name.localeCompare(b.name);
+    });
 }
 
 function getOrders(storeId = null) {
@@ -2014,6 +2109,8 @@ module.exports = {
   setItemBlocked,
   updateItemPaymongoLink,
   updateItemName,
+  updateItemLiveSelling,
+  getLiveSellingItems,
   getOrders,
   getOrderById,
   getAdminNotificationSettings,
@@ -2034,6 +2131,7 @@ module.exports = {
   getPaymongoCheckoutLinks,
   savePaymongoAmountLink,
   deletePaymongoAmountLink,
+  saveStoreTheme,
   createBuyerAccount,
   createOrder,
   approveOrder,
@@ -2047,4 +2145,5 @@ module.exports = {
   inferDeliveryAreaFromRegion,
   inferDeliveryAreaFromAddress,
   getDeliveryFeeByArea,
+  DEFAULT_STORE_THEME_KEY,
 };

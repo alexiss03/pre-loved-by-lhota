@@ -25,7 +25,7 @@
     />
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
-  <body>
+  <body data-store-theme="<%= typeof storeThemeKey === 'string' && storeThemeKey ? storeThemeKey : 'cordoba' %>">
     <% const basePath = typeof storeBasePath === "string" ? storeBasePath : ""; %>
     <% const brandLabel = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota"; %>
     <header class="site-header">
@@ -40,6 +40,7 @@
         </a>
         <nav class="nav-links">
           <a class="main-nav-link" href="<%= basePath %>/shop">Shop</a>
+          <a class="main-nav-link" href="<%= basePath %>/live-selling">Live Selling</a>
           <a class="main-nav-link" href="<%= basePath %>/shop/clothes">Clothes</a>
           <a class="main-nav-link" href="<%= basePath %>/shop/bags">Bags</a>
           <a class="main-nav-link" href="<%= basePath %>/shop/miscellaneous">Miscellaneous</a>

@@ -65,6 +65,7 @@ const {
   sendApprovedOrderEmail,
   sendOrderStatusUpdateEmail,
   sendNewOrderAdminEmail,
+  sendCompletedOrderAdminEmail,
   sendUnprocessedOrderReminderEmail,
 } = require("./utils/mailer");
 const { fetchFacebookPages, postRandomItemsToFacebook } = require("./utils/facebookPoster");
@@ -107,6 +108,16 @@ const STORE_THEMES = Object.freeze([
     key: "cocadim",
     name: "Cocadim",
     description: "Airy cream-and-taupe merchandising inspired by polished online catalogs.",
+  },
+  {
+    key: "pristie",
+    name: "Pristie",
+    description: "Centered boutique-canvas layout with rounded gallery cards and a quieter storefront frame.",
+  },
+  {
+    key: "luxe",
+    name: "Luxe",
+    description: "Editorial landing page with oversized hero photography, image promos, and a refined product strip.",
   },
 ]);
 const requestedUploadStorageProvider = String(
@@ -2360,6 +2371,7 @@ app.post("/admin/notifications/settings", requireStoreOperator, (req, res) => {
     const storeId = getOperatorStoreId(req);
     const enabled = String(req.body.enabled || "") === "1";
     const newOrderEmail = String(req.body.newOrderEmail || "").trim().toLowerCase();
+    const completedOrderEmail = String(req.body.completedOrderEmail || "").trim().toLowerCase();
 
     if (enabled && !newOrderEmail) {
       throw new Error("Notification email is required when admin order notifications are enabled.");
@@ -2369,9 +2381,14 @@ app.post("/admin/notifications/settings", requireStoreOperator, (req, res) => {
       throw new Error("Please enter a valid notification email address.");
     }
 
+    if (completedOrderEmail && !isValidEmail(completedOrderEmail)) {
+      throw new Error("Please enter a valid completed-order email address.");
+    }
+
     saveAdminNotificationSettings({
       enabled,
       newOrderEmail,
+      completedOrderEmail,
     }, storeId);
 
     res.redirect(buildOperatorRedirect(req, {
@@ -2969,6 +2986,13 @@ app.post("/admin/orders/:id/status", requireStoreOperator, async (req, res) => {
         }
       } else {
         await sendOrderStatusUpdateEmail(order);
+      }
+
+      if (nextStatus === ORDER_STATUSES.RECEIVED) {
+        const notificationSettings = getAdminNotificationSettings(storeId);
+        if (notificationSettings.enabled && notificationSettings.completedOrderEmail) {
+          await sendCompletedOrderAdminEmail(notificationSettings.completedOrderEmail, order);
+        }
       }
     } catch (mailError) {
       console.error("Failed to send status email:", mailError.message);

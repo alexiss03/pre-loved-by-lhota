@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: isPlatformAdmin ? "Admin Orders" : "Store Manager Dashboard", storeBasePath, storeName, storeCartKey }) %>
+<%- include('partials/header', { title: isPlatformAdmin ? "Admin Orders" : "Store Manager Dashboard", storeBasePath, storeName, storeCartKey, storeThemeKey }) %>
 
 <section class="section-head admin-header">
   <div>
@@ -71,6 +71,12 @@
   <button type="button" class="admin-tab-button" data-admin-tab-trigger="inventory" role="tab" aria-selected="false">
     Inventory
   </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="live-selling" role="tab" aria-selected="false">
+    Live Selling
+  </button>
+  <button type="button" class="admin-tab-button" data-admin-tab-trigger="appearance" role="tab" aria-selected="false">
+    Appearance
+  </button>
   <button type="button" class="admin-tab-button" data-admin-tab-trigger="facebook" role="tab" aria-selected="false">
     Facebook
   </button>
@@ -86,6 +92,94 @@
     Archived
   </button>
 </nav>
+
+<section class="card admin-tab-panel" data-admin-tab="live-selling">
+  <h2>Live Selling List</h2>
+  <p class="muted">Choose which items are part of this store’s live-selling lineup and assign a slot/order for each stream.</p>
+
+  <% if (liveSellingItems.length === 0) { %>
+    <p class="muted">No items are currently marked for live selling.</p>
+  <% } %>
+
+  <div class="inventory-list">
+    <% inventoryItems.forEach((item) => { %>
+      <article class="inventory-item-row <%= item.isLiveSelling ? 'is-live-selling' : '' %>">
+        <div class="inventory-item-head">
+          <div>
+            <strong><%= item.name %></strong>
+            <p class="muted">
+              <%= item.category %> |
+              <%= formatCurrency(item.price) %> |
+              Stock: <%= item.stock %>
+              <% if (item.liveSellingLabel) { %> |
+                Slot: <strong><%= item.liveSellingLabel %></strong>
+              <% } %>
+            </p>
+          </div>
+          <div class="inventory-actions">
+            <span class="status <%= item.isLiveSelling ? 'paid' : 'pending' %>">
+              <%= item.isLiveSelling ? 'Live Selling' : 'Not in Live List' %>
+            </span>
+          </div>
+        </div>
+
+        <form class="inventory-edit-form" action="/admin/items/<%= encodeURIComponent(item.id) %>/live-selling" method="POST">
+          <div class="inventory-form-grid">
+            <div>
+              <label for="live-enabled-<%= item.id %>">Include in Live Selling</label>
+              <select id="live-enabled-<%= item.id %>" name="isLiveSelling">
+                <option value="1" <%= item.isLiveSelling ? "selected" : "" %>>Yes</option>
+                <option value="0" <%= !item.isLiveSelling ? "selected" : "" %>>No</option>
+              </select>
+            </div>
+            <div>
+              <label for="live-order-<%= item.id %>">Live Order</label>
+              <input id="live-order-<%= item.id %>" name="liveSellingOrder" type="number" min="1" step="1" value="<%= item.liveSellingOrder || 9999 %>" />
+            </div>
+            <div class="inventory-grid-span">
+              <label for="live-label-<%= item.id %>">Live Slot / Label</label>
+              <input id="live-label-<%= item.id %>" name="liveSellingLabel" maxlength="50" value="<%= item.liveSellingLabel || '' %>" placeholder="e.g. Mine 12 / Slot A / LS-03" />
+            </div>
+          </div>
+          <div class="inventory-actions">
+            <button type="submit" class="button button-primary">Save Live Selling</button>
+          </div>
+        </form>
+      </article>
+    <% }) %>
+  </div>
+</section>
+
+<section class="card admin-tab-panel" data-admin-tab="appearance">
+  <h2>Store Theme</h2>
+  <p class="muted">Choose a visual theme for <strong><%= currentStore ? currentStore.name : storeName %></strong>. This updates the storefront colors instantly for this store only.</p>
+
+  <form class="inventory-create-form" action="/admin/store-theme" method="POST">
+    <label for="themeKey">Theme</label>
+    <select id="themeKey" name="themeKey" required>
+      <% availableStoreThemes.forEach((theme) => { %>
+        <option value="<%= theme.key %>" <%= String(storeThemeKey || 'cordoba') === theme.key ? "selected" : "" %>>
+          <%= theme.name %>
+        </option>
+      <% }) %>
+    </select>
+    <button type="submit" class="button button-primary">Apply Theme</button>
+  </form>
+
+  <div class="theme-card-grid">
+    <% availableStoreThemes.forEach((theme) => { %>
+      <article class="theme-card <%= String(storeThemeKey || 'cordoba') === theme.key ? 'is-active' : '' %>" data-theme-preview="<%= theme.key %>">
+        <div class="theme-card-preview">
+          <span class="theme-swatch theme-swatch-bg"></span>
+          <span class="theme-swatch theme-swatch-paper"></span>
+          <span class="theme-swatch theme-swatch-accent"></span>
+        </div>
+        <h3><%= theme.name %></h3>
+        <p class="muted"><%= theme.description %></p>
+      </article>
+    <% }) %>
+  </div>
+</section>
 
 <% if (isPlatformAdmin) { %>
   <section class="card admin-tab-panel" data-admin-tab="stores">
@@ -379,7 +473,7 @@
 
 <section class="card admin-tab-panel" data-admin-tab="email">
   <h2>Order Notifications</h2>
-  <p class="muted">Set where new order emails should be sent for admin alerts.</p>
+  <p class="muted">Set where new-order and completed-order emails should be sent for admin alerts.</p>
 
   <form action="/admin/notifications/settings" method="POST">
     <label class="inline-choice">
@@ -396,6 +490,17 @@
       placeholder="owner@example.com"
       <%= adminNotifications.enabled ? "required" : "" %>
     />
+
+    <label for="completedOrderEmail">Completed Order Email Address</label>
+    <input
+      id="completedOrderEmail"
+      name="completedOrderEmail"
+      type="email"
+      value="<%= adminNotifications.completedOrderEmail || '' %>"
+      placeholder="owner@example.com"
+    />
+
+    <p class="muted">When an order is marked as received, the completed-order email will be sent here.</p>
 
     <p class="muted">Orders pending for <%= pendingReminderHours %>+ hours trigger a one-time reminder email.</p>
 
@@ -430,6 +535,21 @@
         <div>
           <label for="new-item-stock">Stock</label>
           <input id="new-item-stock" name="stock" type="number" min="0" step="1" required />
+        </div>
+        <div>
+          <label for="new-item-live-toggle">Include in Live Selling</label>
+          <select id="new-item-live-toggle" name="isLiveSelling">
+            <option value="0" selected>No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label for="new-item-live-order">Live Order</label>
+          <input id="new-item-live-order" name="liveSellingOrder" type="number" min="1" step="1" value="9999" />
+        </div>
+        <div class="inventory-grid-span">
+          <label for="new-item-live-label">Live Slot / Label</label>
+          <input id="new-item-live-label" name="liveSellingLabel" maxlength="50" placeholder="e.g. Mine 12 / Slot A / LS-03" />
         </div>
         <div class="inventory-grid-span">
           <label for="new-item-image">Image URL</label>
@@ -504,6 +624,21 @@
             <div>
               <label for="inv-stock-<%= item.id %>">Stock</label>
               <input id="inv-stock-<%= item.id %>" name="stock" type="number" min="0" step="1" value="<%= item.stock %>" required />
+            </div>
+            <div>
+              <label for="inv-live-toggle-<%= item.id %>">Include in Live Selling</label>
+              <select id="inv-live-toggle-<%= item.id %>" name="isLiveSelling">
+                <option value="0" <%= !item.isLiveSelling ? "selected" : "" %>>No</option>
+                <option value="1" <%= item.isLiveSelling ? "selected" : "" %>>Yes</option>
+              </select>
+            </div>
+            <div>
+              <label for="inv-live-order-<%= item.id %>">Live Order</label>
+              <input id="inv-live-order-<%= item.id %>" name="liveSellingOrder" type="number" min="1" step="1" value="<%= item.liveSellingOrder || 9999 %>" />
+            </div>
+            <div class="inventory-grid-span">
+              <label for="inv-live-label-<%= item.id %>">Live Slot / Label</label>
+              <input id="inv-live-label-<%= item.id %>" name="liveSellingLabel" maxlength="50" value="<%= item.liveSellingLabel || '' %>" placeholder="e.g. Mine 12 / Slot A / LS-03" />
             </div>
             <div class="inventory-grid-span">
               <label for="inv-image-<%= item.id %>">Image URL</label>
@@ -1006,7 +1141,7 @@
 <script>
   (function () {
     const TAB_STORAGE_KEY = "preloved_admin_active_tab";
-    const allowedTabs = new Set(["orders", "analytics", "email", "inventory", "facebook", "links", "stores", "archived"]);
+    const allowedTabs = new Set(["orders", "analytics", "email", "inventory", "live-selling", "appearance", "facebook", "links", "stores", "archived"]);
     const tabButtons = Array.from(document.querySelectorAll("[data-admin-tab-trigger]"));
     const tabPanels = Array.from(document.querySelectorAll("[data-admin-tab]"));
     const baseUrl = "<%= baseUrl %>";
