@@ -104,10 +104,12 @@
           <p class="item-description"><%= item.description %></p>
           <p class="stock-text"><%= item.stock %> pieces available</p>
           <p class="price"><%= formatCurrency(item.price) %></p>
-          <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
-            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
-          </button>
-          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          <div class="product-card-actions">
+            <button class="button button-primary add-to-cart" data-item-id="<%= item.id %>" <%= item.stock < 1 ? "disabled" : "" %>>
+              <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+            </button>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
         </div>
       </article>
     <% }) %>

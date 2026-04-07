@@ -58,10 +58,12 @@
           <p class="item-description"><%= relatedItem.description %></p>
           <p class="stock-text"><%= relatedItem.stock %> pieces available</p>
           <p class="price"><%= formatCurrency(relatedItem.price) %></p>
-          <button class="button button-primary add-to-cart" data-item-id="<%= relatedItem.id %>" <%= relatedItem.stock < 1 ? "disabled" : "" %>>
-            <%= relatedItem.stock < 1 ? "Out of Stock" : "Add to Cart" %>
-          </button>
-          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>">View Details</a>
+          <div class="product-card-actions">
+            <button class="button button-primary add-to-cart" data-item-id="<%= relatedItem.id %>" <%= relatedItem.stock < 1 ? "disabled" : "" %>>
+              <%= relatedItem.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+            </button>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>">View Details</a>
+          </div>
         </div>
       </article>
     <% }) %>

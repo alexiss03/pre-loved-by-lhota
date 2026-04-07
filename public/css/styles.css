@@ -155,13 +155,13 @@ body::before {
 }
 
 .site-header {
-  background: #111;
-  border-bottom: 1px solid #222;
+  background: #fff;
+  border-bottom: 1px solid #e7ddd2;
   position: relative;
   z-index: 1;
   margin-top: 0;
   backdrop-filter: blur(18px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 14px 30px rgba(53, 38, 28, 0.08);
 }
 
 .announcement-bar {
@@ -222,7 +222,7 @@ body[data-store-theme="luxe"] .announcement-bar {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
-  color: #fff;
+  color: #1b1714;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 1.8rem;
   letter-spacing: -0.01em;
@@ -243,7 +243,7 @@ body[data-store-theme="luxe"] .announcement-bar {
 .nav-links a,
 .nav-icons a {
   text-decoration: none;
-  color: #fff;
+  color: #1b1714;
   font-size: 0.69rem;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -265,10 +265,10 @@ body[data-store-theme="luxe"] .announcement-bar {
 
 .nav-links .main-nav-link:hover,
 .nav-links .main-nav-link:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(17, 17, 17, 0.06);
+  color: #111;
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 24px rgba(42, 29, 22, 0.08);
   outline: none;
 }
 
@@ -286,14 +286,14 @@ body[data-store-theme="luxe"] .announcement-bar {
 }
 
 body[data-store-theme="pristie"] .site-header {
-  background: #111;
-  border-bottom: 1px solid #222;
+  background: #fff;
+  border-bottom: 1px solid #e7ddd2;
   padding-top: 2rem;
 }
 
 body[data-store-theme="luxe"] .site-header {
-  background: #111;
-  border-bottom: 1px solid #222;
+  background: #fff;
+  border-bottom: 1px solid #e7ddd2;
 }
 
 body[data-store-theme="pristie"] .site-header .nav-row,
@@ -311,19 +311,19 @@ body[data-store-theme="luxe"] .page-content {
 
 body[data-store-theme="luxe"] .nav-links a,
 body[data-store-theme="luxe"] .nav-icons a {
-  color: #f6efe4;
+  color: #111;
 }
 
 body[data-store-theme="luxe"] .nav-links .main-nav-link:hover,
 body[data-store-theme="luxe"] .nav-links .main-nav-link:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(17, 17, 17, 0.06);
 }
 
 body[data-store-theme="pristie"] .site-header .nav-row {
   min-height: 68px;
   padding: 0 2rem;
-  background: #111;
-  border: 1px solid #222;
+  background: #fff;
+  border: 1px solid #e4d9cd;
   border-bottom: 0;
 }
 
@@ -340,7 +340,7 @@ body[data-store-theme="pristie"] .nav-icons a {
   text-transform: none;
   letter-spacing: 0;
   font-size: 0.72rem;
-  color: #fff;
+  color: #111;
 }
 
 body[data-store-theme="pristie"] .nav-links .main-nav-link {
@@ -354,7 +354,7 @@ body[data-store-theme="pristie"] .nav-icons a[aria-label="Search"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #dfd4c8;
   border-radius: 999px;
 }
 
@@ -821,6 +821,8 @@ body[data-store-theme="cocadim"] .hero-card {
 .pristie-item-card {
   border: 0;
   background: transparent;
+  min-height: 0;
+  display: block;
 }
 
 .cocadim-item-card .item-image-link,
@@ -908,8 +910,10 @@ body[data-store-theme="cocadim"] .hero-card {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  background: #ada295;
+  background: #111;
   color: #f8f2ea;
+  border-radius: 24px;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
 }
 
 .cocadim-footer-band h2,
@@ -929,9 +933,9 @@ body[data-store-theme="cocadim"] .hero-card {
 
 body[data-store-theme="cocadim"] .cocadim-footer-band .button,
 body[data-store-theme="pristie"] .pristie-footer-band .button {
-  border-color: #f4eade;
-  background: #f4eade;
-  color: #5d4b3d;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #fff;
+  color: #111;
 }
 
 .feature-band-image img {
@@ -997,6 +1001,9 @@ body[data-store-theme="pristie"] .pristie-footer-band .button {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-soft);
+  min-height: 450px;
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) auto;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -1013,11 +1020,13 @@ body[data-store-theme="pristie"] .pristie-footer-band .button {
   display: block;
   text-decoration: none;
   overflow: hidden;
+  height: 100%;
 }
 
 .item-card img {
   width: 100%;
-  height: 250px;
+  height: 100%;
+  min-height: 330px;
   object-fit: cover;
   display: block;
   transition: transform 240ms ease;
@@ -1030,6 +1039,7 @@ body[data-store-theme="pristie"] .pristie-footer-band .button {
 .item-card-body {
   padding: 1rem 1rem 1.05rem;
   text-align: left;
+  align-self: end;
 }
 
 .item-category {
@@ -1156,6 +1166,22 @@ body[data-store-theme="pristie"] .pristie-footer-band .button {
 
 .view-detail-btn {
   margin-top: 0.35rem;
+}
+
+.product-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.product-card-actions .button {
+  width: 100%;
+  min-width: 0;
+}
+
+.product-card-actions .view-detail-btn {
+  margin-top: 0;
 }
 
 .button-block {
@@ -2270,22 +2296,22 @@ input.direct-link-url {
 }
 
 .site-footer {
-  background: var(--footer);
-  color: #4e4138;
+  background: #111;
+  color: #f5f1ea;
   border-top: 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid #222;
   margin-bottom: 0;
 }
 
 body[data-store-theme="pristie"] .site-footer {
-  background: transparent;
+  background: #111;
   border-top: 0;
   padding-bottom: 2.25rem;
 }
 
 body[data-store-theme="pristie"] .site-footer .footer-grid {
-  background: #fffdf9;
-  border-top: 1px solid #e6ddd1;
+  background: #111;
+  border-top: 1px solid #222;
   padding: 1.35rem 2rem 0;
 }
 
@@ -2488,12 +2514,12 @@ code {
 
 .footer-grid p {
   margin: 0.35rem 0;
-  color: #6a5c52;
+  color: rgba(245, 241, 234, 0.72);
   font-size: 0.78rem;
 }
 
 .footer-grid a {
-  color: #4d3f35;
+  color: #fff;
   text-decoration: none;
 }
 
@@ -2899,6 +2925,10 @@ code {
     font-size: 0.72rem;
     padding: 0.62rem 0.92rem;
     min-height: 42px;
+  }
+
+  .product-card-actions {
+    grid-template-columns: 1fr;
   }
 
   .admin-header {

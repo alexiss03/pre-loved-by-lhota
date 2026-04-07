@@ -177,14 +177,16 @@
               <%= item.stock < 1 ? "disabled" : "" %>
             />
           </div>
-          <button
-            class="button button-primary checkout-add-to-cart"
-            data-item-id="<%= item.id %>"
-            <%= item.stock < 1 ? "disabled" : "" %>
-          >
-            <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
-          </button>
-          <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          <div class="product-card-actions">
+            <button
+              class="button button-primary checkout-add-to-cart"
+              data-item-id="<%= item.id %>"
+              <%= item.stock < 1 ? "disabled" : "" %>
+            >
+              <%= item.stock < 1 ? "Out of Stock" : "Add to Cart" %>
+            </button>
+            <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
+          </div>
         </div>
       </article>
     <% }) %>
