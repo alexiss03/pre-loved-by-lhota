@@ -90,8 +90,8 @@ body[data-store-theme="luxe"] {
   --bg: #eeece4;
   --paper: #faf8f2;
   --soft: #f1eee6;
-  --ink: #f8f3eb;
-  --muted: #e8dfd2;
+  --ink: #2e2924;
+  --muted: #6f665d;
   --line: #d7d0c4;
   --accent: #515243;
   --footer: #9b988f;
@@ -2301,6 +2301,14 @@ input.direct-link-url {
   border-top: 0;
   border-top: 1px solid #222;
   margin-bottom: 0;
+}
+
+.site-footer h1,
+.site-footer h2,
+.site-footer h3,
+.site-footer strong,
+.site-footer code {
+  color: #fff;
 }
 
 body[data-store-theme="pristie"] .site-footer {

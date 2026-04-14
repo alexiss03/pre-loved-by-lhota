@@ -17,6 +17,23 @@ function sanitizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
+function toAbsoluteUrl(baseUrl, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(text)) {
+    return text;
+  }
+
+  const normalizedBaseUrl = sanitizeBaseUrl(baseUrl);
+  if (!normalizedBaseUrl) {
+    return text;
+  }
+
+  return `${normalizedBaseUrl}${text.startsWith("/") ? text : `/${text}`}`;
+}
+
 function sanitizeAccessToken(value) {
   let token = String(value || "").trim();
 
@@ -104,6 +121,32 @@ function buildPostMessage(items, baseUrl) {
   return lines.join("\n");
 }
 
+async function uploadPhotoToFacebook({ pageId, accessToken, imageUrl }) {
+  const payload = new URLSearchParams({
+    url: imageUrl,
+    published: "false",
+    access_token: accessToken,
+  });
+
+  const response = await fetch(
+    `https://graph.facebook.com/v20.0/${encodeURIComponent(pageId)}/photos`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: payload,
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
+    throw new Error(formatFacebookApiError(data?.error || {}, response.status));
+  }
+
+  return String(data.id || "").trim();
+}
+
 async function postRandomItemsToFacebook(config, allItems) {
   const pageId = String(config.pageId || "").trim();
   const accessToken = sanitizeAccessToken(config.pageAccessToken);
@@ -139,13 +182,41 @@ async function postRandomItemsToFacebook(config, allItems) {
   );
 
   const message = buildPostMessage(pickedItems, baseUrl);
-  const firstItemUrl = `${baseUrl}/product/${encodeURIComponent(pickedItems[0].id)}`;
+  const uploadedPhotoIds = [];
+
+  for (const item of pickedItems) {
+    const imageUrl = toAbsoluteUrl(baseUrl, item && item.imageUrl);
+    if (!imageUrl) {
+      continue;
+    }
+
+    try {
+      const mediaId = await uploadPhotoToFacebook({
+        pageId,
+        accessToken,
+        imageUrl,
+      });
+      if (mediaId) {
+        uploadedPhotoIds.push(mediaId);
+      }
+    } catch (error) {
+      console.warn(`Skipping Facebook image upload for item ${item.id}: ${error.message}`);
+    }
+  }
 
   const payload = new URLSearchParams({
     message,
-    link: firstItemUrl,
     access_token: accessToken,
   });
+
+  if (uploadedPhotoIds.length > 0) {
+    uploadedPhotoIds.forEach((mediaId, index) => {
+      payload.append(`attached_media[${index}]`, JSON.stringify({ media_fbid: mediaId }));
+    });
+  } else {
+    const firstItemUrl = `${baseUrl}/product/${encodeURIComponent(pickedItems[0].id)}`;
+    payload.set("link", firstItemUrl);
+  }
 
   const response = await fetch(
     `https://graph.facebook.com/v20.0/${encodeURIComponent(pageId)}/feed`,
@@ -168,6 +239,7 @@ async function postRandomItemsToFacebook(config, allItems) {
     postId: String(data.id || ""),
     pickedItems,
     message,
+    uploadedPhotoCount: uploadedPhotoIds.length,
   };
 }
 

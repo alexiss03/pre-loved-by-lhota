@@ -13,6 +13,12 @@
     if (key === "BAGS") {
       return `${storeBasePath}/shop/bags`;
     }
+    if (key === "TRIPS") {
+      return `${storeBasePath}/shop/trips`;
+    }
+    if (key === "CARS") {
+      return `${storeBasePath}/shop/cars`;
+    }
     if (key === "MISCELLANEOUS") {
       return `${storeBasePath}/shop/miscellaneous`;
     }
@@ -100,6 +106,9 @@
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= item.category %></span>
+          <% if (item.size) { %>
+            <p class="muted">Size: <strong><%= item.size %></strong></p>
+          <% } %>
           <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
           <p class="item-description"><%= item.description %></p>
           <p class="stock-text"><%= item.stock %> pieces available</p>

@@ -37,8 +37,11 @@ const ORDER_STATUSES = Object.freeze({
 const ITEM_CATEGORIES = Object.freeze({
   CLOTHES: "Clothes",
   BAGS: "Bags",
+  TRIPS: "Trips",
+  CARS: "Cars",
   MISCELLANEOUS: "Miscellaneous",
 });
+const ALL_ITEM_CATEGORIES = Object.freeze(Object.values(ITEM_CATEGORIES));
 const ORDER_STATUS_TRANSITIONS = Object.freeze({
   [ORDER_STATUSES.PENDING]: [ORDER_STATUSES.PAID],
   [ORDER_STATUSES.PAID]: [ORDER_STATUSES.FOR_DELIVERY],
@@ -87,11 +90,78 @@ const DEFAULT_PAYMONGO_CHECKOUT_LINKS = Object.freeze({
   step: 50,
   links: {},
 });
+const DEFAULT_SITE_VISIT_ANALYTICS = Object.freeze({
+  totalVisits: 0,
+  uniqueVisitors: 0,
+  lastVisitedAt: null,
+  knownVisitors: [],
+  pages: [],
+  daily: [],
+});
 const DEFAULT_STORE_SUBSCRIPTION = Object.freeze({
   plan: "Starter",
   status: "ACTIVE",
+  startedAt: null,
+  durationDays: null,
+  endsAt: null,
 });
 const DEFAULT_STORE_THEME_KEY = "cordoba";
+
+function normalizeDateOnly(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return null;
+  }
+  return text;
+}
+
+function normalizePositiveIntegerOrNull(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function computeSubscriptionEndDate(startedAt, durationDays) {
+  const startDate = normalizeDateOnly(startedAt);
+  const normalizedDuration = normalizePositiveIntegerOrNull(durationDays);
+  if (!startDate || !normalizedDuration) {
+    return null;
+  }
+
+  const date = new Date(`${startDate}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  date.setUTCDate(date.getUTCDate() + normalizedDuration - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeStoreSubscription(input = {}) {
+  const source = input && typeof input === "object" ? input : {};
+  const plan = String(source.subscriptionPlan || source.plan || DEFAULT_STORE_SUBSCRIPTION.plan).trim()
+    || DEFAULT_STORE_SUBSCRIPTION.plan;
+  const status = String(source.subscriptionStatus || source.status || DEFAULT_STORE_SUBSCRIPTION.status).trim().toUpperCase()
+    || DEFAULT_STORE_SUBSCRIPTION.status;
+  const startedAt = normalizeDateOnly(source.subscriptionStartedAt || source.startedAt || null);
+  const durationDays = normalizePositiveIntegerOrNull(source.subscriptionDurationDays || source.durationDays || null);
+  const endsAt = normalizeDateOnly(
+    source.subscriptionEndsAt || source.endsAt || computeSubscriptionEndDate(startedAt, durationDays)
+  );
+
+  return {
+    subscriptionPlan: plan,
+    subscriptionStatus: status,
+    subscriptionStartedAt: startedAt,
+    subscriptionDurationDays: durationDays,
+    subscriptionEndsAt: endsAt || computeSubscriptionEndDate(startedAt, durationDays),
+  };
+}
 
 function slugifyStoreName(value) {
   const text = String(value || "")
@@ -105,21 +175,101 @@ function slugifyStoreName(value) {
 function createStoreSettingsFromLegacyMeta(meta = {}) {
   return {
     themeKey: String(meta.themeKey || DEFAULT_STORE_THEME_KEY).trim().toLowerCase() || DEFAULT_STORE_THEME_KEY,
+    availableCategories: normalizeStoreAvailableCategories(meta.availableCategories || ALL_ITEM_CATEGORIES),
     adminNotifications: { ...DEFAULT_ADMIN_NOTIFICATION_SETTINGS, ...(meta.adminNotifications || {}) },
     smtpSettings: { ...DEFAULT_SMTP_SETTINGS, ...(meta.smtpSettings || {}) },
     facebookAutoPost: { ...DEFAULT_FACEBOOK_AUTO_POST, ...(meta.facebookAutoPost || {}) },
     paymongoCheckoutLinks: { ...DEFAULT_PAYMONGO_CHECKOUT_LINKS, ...(meta.paymongoCheckoutLinks || {}) },
+    siteVisitAnalytics: normalizeSiteVisitAnalytics(meta.siteVisitAnalytics || {}),
+  };
+}
+
+function normalizeStoreAvailableCategories(values) {
+  const list = Array.isArray(values) ? values : ALL_ITEM_CATEGORIES;
+  const normalized = [];
+
+  for (const category of list) {
+    const value = String(category || "").trim().toUpperCase();
+    if (value === "CLOTHES" && !normalized.includes(ITEM_CATEGORIES.CLOTHES)) {
+      normalized.push(ITEM_CATEGORIES.CLOTHES);
+    } else if ((value === "BAGS" || value === "BAG") && !normalized.includes(ITEM_CATEGORIES.BAGS)) {
+      normalized.push(ITEM_CATEGORIES.BAGS);
+    } else if ((value === "TRIPS" || value === "TRIP" || value === "TRAVEL") && !normalized.includes(ITEM_CATEGORIES.TRIPS)) {
+      normalized.push(ITEM_CATEGORIES.TRIPS);
+    } else if ((value === "CARS" || value === "CAR" || value === "AUTOMOTIVE") && !normalized.includes(ITEM_CATEGORIES.CARS)) {
+      normalized.push(ITEM_CATEGORIES.CARS);
+    } else if (
+      ["MISCELLANEOUS", "MISC", "UTENSILS", "MISCELLANEOUS ITEMS"].includes(value) &&
+      !normalized.includes(ITEM_CATEGORIES.MISCELLANEOUS)
+    ) {
+      normalized.push(ITEM_CATEGORIES.MISCELLANEOUS);
+    }
+  }
+
+  return normalized.length > 0 ? normalized : [...ALL_ITEM_CATEGORIES];
+}
+
+function normalizeSiteVisitAnalytics(input) {
+  const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const knownVisitors = Array.isArray(source.knownVisitors)
+    ? source.knownVisitors
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .slice(-10000)
+    : [];
+  const pages = Array.isArray(source.pages)
+    ? source.pages
+        .map((entry) => ({
+          path: String((entry && entry.path) || "").trim(),
+          label: String((entry && entry.label) || "").trim(),
+          visits: Number.isFinite(Number(entry && entry.visits)) ? Math.max(0, Math.floor(Number(entry.visits))) : 0,
+          lastVisitedAt: (entry && entry.lastVisitedAt) || null,
+        }))
+        .filter((entry) => entry.path && entry.visits > 0)
+        .slice(0, 50)
+    : [];
+  const daily = Array.isArray(source.daily)
+    ? source.daily
+        .map((entry) => ({
+          date: String((entry && entry.date) || "").trim(),
+          visits: Number.isFinite(Number(entry && entry.visits)) ? Math.max(0, Math.floor(Number(entry.visits))) : 0,
+          uniqueVisitors: Number.isFinite(Number(entry && entry.uniqueVisitors))
+            ? Math.max(0, Math.floor(Number(entry.uniqueVisitors)))
+            : 0,
+          visitorIds: Array.isArray(entry && entry.visitorIds)
+            ? entry.visitorIds.map((value) => String(value || "").trim()).filter(Boolean).slice(-5000)
+            : [],
+        }))
+        .filter((entry) => /^\d{4}-\d{2}-\d{2}$/.test(entry.date))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-30)
+    : [];
+
+  return {
+    ...DEFAULT_SITE_VISIT_ANALYTICS,
+    totalVisits: Number.isFinite(Number(source.totalVisits)) ? Math.max(0, Math.floor(Number(source.totalVisits))) : 0,
+    uniqueVisitors: Number.isFinite(Number(source.uniqueVisitors))
+      ? Math.max(0, Math.floor(Number(source.uniqueVisitors)))
+      : knownVisitors.length,
+    lastVisitedAt: source.lastVisitedAt || null,
+    knownVisitors,
+    pages,
+    daily,
   };
 }
 
 function createDefaultStore(overrides = {}) {
+  const subscription = normalizeStoreSubscription(overrides);
   return {
     id: 1,
     slug: "pre-loved-by-lhota",
     name: "Pre-loved by Lhota",
     description: "Curated preloved pieces.",
-    subscriptionPlan: DEFAULT_STORE_SUBSCRIPTION.plan,
-    subscriptionStatus: DEFAULT_STORE_SUBSCRIPTION.status,
+    subscriptionPlan: subscription.subscriptionPlan,
+    subscriptionStatus: subscription.subscriptionStatus,
+    subscriptionStartedAt: subscription.subscriptionStartedAt,
+    subscriptionDurationDays: subscription.subscriptionDurationDays,
+    subscriptionEndsAt: subscription.subscriptionEndsAt,
     managerUserId: null,
     createdAt: new Date().toISOString(),
     settings: createStoreSettingsFromLegacyMeta(),
@@ -146,6 +296,7 @@ const initialData = {
       storeId: 1,
       name: "Floral Summer Dress",
       category: "Clothes",
+      size: "Medium",
       price: 450,
       stock: 5,
       description: "Lightweight preloved dress in excellent condition.",
@@ -159,6 +310,7 @@ const initialData = {
       storeId: 1,
       name: "Denim Jacket",
       category: "Clothes",
+      size: "Large",
       price: 650,
       stock: 4,
       description: "Classic denim jacket with minimal signs of use.",
@@ -432,6 +584,12 @@ function normalizeCategories(store) {
     if (item.category === "Utensils") {
       item.category = "Miscellaneous";
       hasChanges = true;
+    } else if (String(item.category || "").trim().toUpperCase() === "TRIP") {
+      item.category = "Trips";
+      hasChanges = true;
+    } else if (String(item.category || "").trim().toUpperCase() === "CAR") {
+      item.category = "Cars";
+      hasChanges = true;
     }
   }
 
@@ -439,6 +597,12 @@ function normalizeCategories(store) {
     for (const orderItem of order.items || []) {
       if (orderItem.category === "Utensils") {
         orderItem.category = "Miscellaneous";
+        hasChanges = true;
+      } else if (String(orderItem.category || "").trim().toUpperCase() === "TRIP") {
+        orderItem.category = "Trips";
+        hasChanges = true;
+      } else if (String(orderItem.category || "").trim().toUpperCase() === "CAR") {
+        orderItem.category = "Cars";
         hasChanges = true;
       }
     }
@@ -636,6 +800,12 @@ function normalizeItems(store) {
       item.liveSellingLabel = normalizedLiveSellingLabel;
       hasChanges = true;
     }
+
+    const normalizedSize = normalizeItemSize(item.size || "");
+    if (item.size !== normalizedSize) {
+      item.size = normalizedSize;
+      hasChanges = true;
+    }
   }
 
   return hasChanges;
@@ -726,19 +896,25 @@ function normalizeStoreStructure(store) {
       themeKey:
         String((currentSettings && currentSettings.themeKey) || DEFAULT_STORE_THEME_KEY).trim().toLowerCase() ||
         DEFAULT_STORE_THEME_KEY,
+      availableCategories: normalizeStoreAvailableCategories(currentSettings.availableCategories || ALL_ITEM_CATEGORIES),
       adminNotifications: normalizeAdminNotificationSettings(currentSettings.adminNotifications || {}),
       smtpSettings: normalizeSmtpSettings(currentSettings.smtpSettings || {}),
       facebookAutoPost: normalizeFacebookAutoPostConfig(currentSettings.facebookAutoPost || {}),
       paymongoCheckoutLinks: normalizePaymongoCheckoutLinks(currentSettings.paymongoCheckoutLinks || {}),
+      siteVisitAnalytics: normalizeSiteVisitAnalytics(currentSettings.siteVisitAnalytics || {}),
     };
 
+    const normalizedSubscription = normalizeStoreSubscription(entry || {});
     const normalizedStore = {
       id,
       slug,
       name: String((entry && entry.name) || `Store ${id}`).trim() || `Store ${id}`,
       description: String((entry && entry.description) || "").trim(),
-      subscriptionPlan: String((entry && entry.subscriptionPlan) || DEFAULT_STORE_SUBSCRIPTION.plan).trim() || DEFAULT_STORE_SUBSCRIPTION.plan,
-      subscriptionStatus: String((entry && entry.subscriptionStatus) || DEFAULT_STORE_SUBSCRIPTION.status).trim().toUpperCase() || DEFAULT_STORE_SUBSCRIPTION.status,
+      subscriptionPlan: normalizedSubscription.subscriptionPlan,
+      subscriptionStatus: normalizedSubscription.subscriptionStatus,
+      subscriptionStartedAt: normalizedSubscription.subscriptionStartedAt,
+      subscriptionDurationDays: normalizedSubscription.subscriptionDurationDays,
+      subscriptionEndsAt: normalizedSubscription.subscriptionEndsAt,
       managerUserId: Number.isInteger(Number(entry && entry.managerUserId)) ? Number(entry.managerUserId) : null,
       createdAt: (entry && entry.createdAt) || new Date().toISOString(),
       settings: normalizedSettings,
@@ -1132,6 +1308,20 @@ function saveStoreTheme(themeKey, storeId = null) {
   return settings.themeKey;
 }
 
+function getStoreAvailableCategories(storeId = null) {
+  const store = readStore();
+  return normalizeStoreAvailableCategories(getStoreSettings(store, storeId).availableCategories);
+}
+
+function saveStoreAvailableCategories(values, storeId = null) {
+  const store = readStore();
+  const settings = getStoreSettings(store, storeId);
+  const normalized = normalizeStoreAvailableCategories(values);
+  settings.availableCategories = normalized;
+  writeStore(store);
+  return normalized;
+}
+
 function createStore(payload) {
   const store = readStore();
   const name = String(payload.name || "").trim();
@@ -1140,13 +1330,17 @@ function createStore(payload) {
   }
 
   const slug = ensureUniqueStoreSlug(store, payload.slug || name);
+  const subscription = normalizeStoreSubscription(payload || {});
   const nextStore = {
     id: store.meta.nextStoreId,
     slug,
     name,
     description: String(payload.description || "").trim(),
-    subscriptionPlan: String(payload.subscriptionPlan || DEFAULT_STORE_SUBSCRIPTION.plan).trim() || DEFAULT_STORE_SUBSCRIPTION.plan,
-    subscriptionStatus: String(payload.subscriptionStatus || DEFAULT_STORE_SUBSCRIPTION.status).trim().toUpperCase() || DEFAULT_STORE_SUBSCRIPTION.status,
+    subscriptionPlan: subscription.subscriptionPlan,
+    subscriptionStatus: subscription.subscriptionStatus,
+    subscriptionStartedAt: subscription.subscriptionStartedAt,
+    subscriptionDurationDays: subscription.subscriptionDurationDays,
+    subscriptionEndsAt: subscription.subscriptionEndsAt,
     managerUserId: null,
     createdAt: new Date().toISOString(),
     settings: createStoreSettingsFromLegacyMeta(),
@@ -1156,6 +1350,35 @@ function createStore(payload) {
   store.stores.push(nextStore);
   writeStore(store);
   return nextStore;
+}
+
+function updateStoreSubscription(payload) {
+  const store = readStore();
+  const storeId = normalizeStoreId(payload.storeId, getDefaultStoreId(store));
+  const targetStore = store.stores.find((entry) => Number(entry.id) === storeId);
+  if (!targetStore) {
+    throw new Error("Store not found.");
+  }
+
+  const normalizedSubscription = normalizeStoreSubscription(payload || {});
+  targetStore.subscriptionPlan = normalizedSubscription.subscriptionPlan;
+  targetStore.subscriptionStatus = normalizedSubscription.subscriptionStatus;
+  targetStore.subscriptionStartedAt = normalizedSubscription.subscriptionStartedAt;
+  targetStore.subscriptionDurationDays = normalizedSubscription.subscriptionDurationDays;
+  targetStore.subscriptionEndsAt = normalizedSubscription.subscriptionEndsAt;
+  writeStore(store);
+  return { ...targetStore };
+}
+
+function clearStoreSubscription(storeId) {
+  return updateStoreSubscription({
+    storeId,
+    subscriptionPlan: "None",
+    subscriptionStatus: "NONE",
+    subscriptionStartedAt: null,
+    subscriptionDurationDays: null,
+    subscriptionEndsAt: null,
+  });
 }
 
 function getItems(storeId = null) {
@@ -1175,6 +1398,12 @@ function normalizeItemCategory(value) {
   if (normalized === "BAGS" || normalized === "BAG") {
     return ITEM_CATEGORIES.BAGS;
   }
+  if (normalized === "TRIPS" || normalized === "TRIP" || normalized === "TRAVEL") {
+    return ITEM_CATEGORIES.TRIPS;
+  }
+  if (normalized === "CARS" || normalized === "CAR" || normalized === "AUTOMOTIVE") {
+    return ITEM_CATEGORIES.CARS;
+  }
   if (
     normalized === "MISCELLANEOUS" ||
     normalized === "MISC" ||
@@ -1183,7 +1412,7 @@ function normalizeItemCategory(value) {
   ) {
     return ITEM_CATEGORIES.MISCELLANEOUS;
   }
-  throw new Error("Category must be Clothes, Bags, or Miscellaneous.");
+  throw new Error("Category must be Clothes, Bags, Trips, Cars, or Miscellaneous.");
 }
 
 function normalizeItemName(value) {
@@ -1204,6 +1433,17 @@ function normalizeItemDescription(value) {
   }
   if (normalized.length > 500) {
     throw new Error("Description is too long.");
+  }
+  return normalized;
+}
+
+function normalizeItemSize(value) {
+  const normalized = String(value || "").trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length > 40) {
+    throw new Error("Size is too long.");
   }
   return normalized;
 }
@@ -1238,6 +1478,12 @@ function getItemPrefixByCategory(category) {
   }
   if (category === ITEM_CATEGORIES.BAGS) {
     return "BG";
+  }
+  if (category === ITEM_CATEGORIES.TRIPS) {
+    return "TR";
+  }
+  if (category === ITEM_CATEGORIES.CARS) {
+    return "CR";
   }
   return "MS";
 }
@@ -1283,6 +1529,7 @@ function createItem(payload) {
     storeId,
     name: normalizeItemName(payload.name),
     category,
+    size: normalizeItemSize(payload.size),
     price: normalizeItemPrice(payload.price),
     stock: normalizeItemStock(payload.stock),
     description: normalizeItemDescription(payload.description),
@@ -1318,6 +1565,7 @@ function updateItemInventory(itemId, payload) {
 
   item.name = normalizeItemName(payload.name);
   item.category = normalizeItemCategory(payload.category);
+  item.size = normalizeItemSize(payload.size);
   item.price = normalizeItemPrice(payload.price);
   item.stock = normalizeItemStock(payload.stock);
   item.description = normalizeItemDescription(payload.description);
@@ -1523,6 +1771,81 @@ function setFacebookAutoPostLastResult(payload, storeId = null) {
 function getPaymongoCheckoutLinks(storeId = null) {
   const store = readStore();
   return normalizePaymongoCheckoutLinks(getStoreSettings(store, storeId).paymongoCheckoutLinks);
+}
+
+function getSiteVisitAnalytics(storeId = null) {
+  const store = readStore();
+  return normalizeSiteVisitAnalytics(getStoreSettings(store, storeId).siteVisitAnalytics);
+}
+
+function recordSiteVisit(payload, storeId = null) {
+  const store = readStore();
+  const settings = getStoreSettings(store, storeId);
+  const current = normalizeSiteVisitAnalytics(settings.siteVisitAnalytics);
+  const visitorId = String(payload && payload.visitorId || "").trim();
+  const pagePath = String(payload && payload.path || "").trim();
+  const pageLabel = String(payload && payload.label || "").trim() || pagePath || "Page";
+  const visitedAt = String(payload && payload.visitedAt || "").trim() || new Date().toISOString();
+  const dayKey = String(visitedAt).slice(0, 10);
+
+  if (!visitorId || !pagePath || !/^\d{4}-\d{2}-\d{2}/.test(visitedAt)) {
+    throw new Error("Visitor ID, path, and visitedAt are required.");
+  }
+
+  current.totalVisits += 1;
+  current.lastVisitedAt = visitedAt;
+
+  if (!current.knownVisitors.includes(visitorId)) {
+    current.knownVisitors.push(visitorId);
+    if (current.knownVisitors.length > 10000) {
+      current.knownVisitors = current.knownVisitors.slice(-10000);
+    }
+    current.uniqueVisitors = current.knownVisitors.length;
+  } else if (!Number.isInteger(current.uniqueVisitors) || current.uniqueVisitors < current.knownVisitors.length) {
+    current.uniqueVisitors = current.knownVisitors.length;
+  }
+
+  const existingPage = current.pages.find((entry) => entry.path === pagePath);
+  if (existingPage) {
+    existingPage.visits += 1;
+    existingPage.label = pageLabel;
+    existingPage.lastVisitedAt = visitedAt;
+  } else {
+    current.pages.push({
+      path: pagePath,
+      label: pageLabel,
+      visits: 1,
+      lastVisitedAt: visitedAt,
+    });
+  }
+
+  current.pages = current.pages
+    .sort((a, b) => b.visits - a.visits || String(b.lastVisitedAt || "").localeCompare(String(a.lastVisitedAt || "")))
+    .slice(0, 50);
+
+  let dailyEntry = current.daily.find((entry) => entry.date === dayKey);
+  if (!dailyEntry) {
+    dailyEntry = {
+      date: dayKey,
+      visits: 0,
+      uniqueVisitors: 0,
+      visitorIds: [],
+    };
+    current.daily.push(dailyEntry);
+  }
+
+  dailyEntry.visits += 1;
+  if (!dailyEntry.visitorIds.includes(visitorId)) {
+    dailyEntry.visitorIds.push(visitorId);
+  }
+  dailyEntry.uniqueVisitors = dailyEntry.visitorIds.length;
+  current.daily = current.daily
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30);
+
+  settings.siteVisitAnalytics = current;
+  writeStore(store);
+  return normalizeSiteVisitAnalytics(current);
 }
 
 function savePaymongoAmountLink(amount, link, storeId = null) {
@@ -1793,6 +2116,7 @@ function createOrder(payload) {
       itemId: product.id,
       name: product.name,
       category: product.category,
+      size: normalizeItemSize(product.size),
       quantity: requestedItem.quantity,
       unitPrice: product.price,
       subtotal: product.price * requestedItem.quantity,
@@ -2102,6 +2426,10 @@ module.exports = {
   getStoreById,
   getStoreBySlug,
   createStore,
+  updateStoreSubscription,
+  clearStoreSubscription,
+  getStoreAvailableCategories,
+  saveStoreAvailableCategories,
   ensureDataFile,
   getItems,
   createItem,
@@ -2129,6 +2457,8 @@ module.exports = {
   setFacebookAutoPostLastResult,
   normalizePaymongoCheckoutLinks,
   getPaymongoCheckoutLinks,
+  getSiteVisitAnalytics,
+  recordSiteVisit,
   savePaymongoAmountLink,
   deletePaymongoAmountLink,
   saveStoreTheme,
@@ -2146,4 +2476,5 @@ module.exports = {
   inferDeliveryAreaFromAddress,
   getDeliveryFeeByArea,
   DEFAULT_STORE_THEME_KEY,
+  ALL_ITEM_CATEGORIES,
 };

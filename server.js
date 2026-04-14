@@ -6,6 +6,7 @@ const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const cron = require("node-cron");
 
 const {
@@ -20,6 +21,10 @@ const {
   getStoreById,
   getStoreBySlug,
   createStore,
+  updateStoreSubscription,
+  clearStoreSubscription,
+  getStoreAvailableCategories,
+  saveStoreAvailableCategories,
   saveStoreTheme,
   getItems,
   getLiveSellingItems,
@@ -35,6 +40,8 @@ const {
   saveFacebookAutoPostConfig,
   setFacebookAutoPostLastResult,
   getPaymongoCheckoutLinks,
+  getSiteVisitAnalytics,
+  recordSiteVisit,
   savePaymongoAmountLink,
   deletePaymongoAmountLink,
   authenticateBuyerAccount,
@@ -55,6 +62,7 @@ const {
   markOrderEmailNotified,
   markOrderPendingReminderNotified,
   DEFAULT_STORE_THEME_KEY,
+  ALL_ITEM_CATEGORIES,
 } = require("./db");
 const {
   formatOrderStatus,
@@ -340,6 +348,37 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (!shouldTrackSiteVisit(req)) {
+    next();
+    return;
+  }
+
+  try {
+    const store = getTrackedStoreForRequest(req);
+    if (!store) {
+      next();
+      return;
+    }
+
+    const visitorId = getOrCreateVisitorId(req, res);
+    const pageLabel = getTrackedPageLabel(req);
+    recordSiteVisit(
+      {
+        visitorId,
+        path: String(req.path || ""),
+        label: pageLabel,
+        visitedAt: new Date().toISOString(),
+      },
+      store.id
+    );
+  } catch (error) {
+    console.error("Site visit analytics tracking failed:", error.message);
+  }
+
+  next();
+});
+
 app.locals.formatCurrency = (value) => `PHP ${Number(value).toFixed(2)}`;
 app.locals.formatDate = (value) =>
   new Date(value).toLocaleString("en-PH", {
@@ -386,12 +425,14 @@ function getStoreRenderContext(store) {
   const activeStore = store || getPlatformDefaultStore();
   const rawThemeKey = activeStore && activeStore.settings ? activeStore.settings.themeKey : DEFAULT_STORE_THEME_KEY;
   const themeKey = STORE_THEMES.some((theme) => theme.key === rawThemeKey) ? rawThemeKey : DEFAULT_STORE_THEME_KEY;
+  const storeAvailableCategories = activeStore ? getStoreAvailableCategories(activeStore.id) : [...ALL_ITEM_CATEGORIES];
   return {
     activeStore,
     storeName: activeStore ? activeStore.name : "Pre-loved by Lhota",
     storeBasePath: activeStore ? buildStoreBasePath(activeStore) : "",
     storeCartKey: activeStore ? buildStoreCartKey(activeStore) : "preloved_cart",
     storeThemeKey: themeKey,
+    storeAvailableCategories,
   };
 }
 
@@ -496,10 +537,12 @@ async function renderOperatorDashboard(req, res) {
 
   const orders = getOrders(currentStore.id);
   const items = getItems(currentStore.id);
-  const analytics = buildAdminAnalytics({ orders, items });
+  const siteVisits = getSiteVisitAnalytics(currentStore.id);
+  const analytics = buildAdminAnalytics({ orders, items, siteVisits });
   const inventoryItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
   const liveSellingItems = getLiveSellingItems(currentStore.id);
   const paymongoCheckout = getPaymongoCheckoutLinks(currentStore.id);
+  const storeAvailableCategories = getStoreAvailableCategories(currentStore.id);
   const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
   const adminNotifications = getAdminNotificationSettings(currentStore.id);
   const smtpSettings = getSmtpSettings(currentStore.id);
@@ -519,7 +562,8 @@ async function renderOperatorDashboard(req, res) {
     items,
     inventoryItems,
     liveSellingItems,
-    inventoryCategories: Object.values(ITEM_CATEGORIES),
+    inventoryCategories: storeAvailableCategories,
+    allStoreCategories: [...ALL_ITEM_CATEGORIES],
     analytics,
     paymongoCheckout,
     baseUrl,
@@ -540,6 +584,7 @@ async function renderOperatorDashboard(req, res) {
     operatorDashboardPath: getOperatorDashboardPath(req),
     currentStore,
     stores,
+    todayDateInput: new Date().toISOString().slice(0, 10),
     currentStoreManager: currentStore.managerUserId ? getStoreManagerPublicById(currentStore.managerUserId) : null,
     availableStoreThemes: STORE_THEMES,
   });
@@ -854,7 +899,7 @@ async function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "", im
   throw new Error("Please upload a photo or provide an image URL.");
 }
 
-function buildAdminAnalytics({ orders, items }) {
+function buildAdminAnalytics({ orders, items, siteVisits }) {
   const activeOrders = orders.filter((order) => !order.isArchived);
   const revenueOrders = activeOrders.filter((order) => {
     const status = String(order.status || "").toUpperCase();
@@ -919,6 +964,11 @@ function buildAdminAnalytics({ orders, items }) {
   const latestOrders = [...activeOrders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
+  const visitAnalytics = siteVisits || {};
+  const dailyVisits = Array.isArray(visitAnalytics.daily) ? visitAnalytics.daily : [];
+  const pages = Array.isArray(visitAnalytics.pages) ? visitAnalytics.pages : [];
+  const latestDay = dailyVisits[dailyVisits.length - 1] || null;
+  const previousDay = dailyVisits[dailyVisits.length - 2] || null;
 
   return {
     totalRevenue,
@@ -934,7 +984,102 @@ function buildAdminAnalytics({ orders, items }) {
     topCategories,
     topItems,
     statusCounts,
+    siteVisits: {
+      totalVisits: Number(visitAnalytics.totalVisits || 0),
+      uniqueVisitors: Number(visitAnalytics.uniqueVisitors || 0),
+      lastVisitedAt: visitAnalytics.lastVisitedAt || null,
+      todayVisits: Number(latestDay && latestDay.visits || 0),
+      todayUniqueVisitors: Number(latestDay && latestDay.uniqueVisitors || 0),
+      previousDayVisits: Number(previousDay && previousDay.visits || 0),
+      topPages: [...pages]
+        .sort((a, b) => Number(b.visits || 0) - Number(a.visits || 0) || String(a.label || "").localeCompare(String(b.label || "")))
+        .slice(0, 5),
+      recentDaily: dailyVisits.slice(-7).reverse(),
+    },
   };
+}
+
+function parseCookieHeader(req) {
+  const raw = String(req.headers.cookie || "");
+  return raw.split(";").reduce((accumulator, part) => {
+    const [key, ...valueParts] = part.split("=");
+    const normalizedKey = String(key || "").trim();
+    if (!normalizedKey) {
+      return accumulator;
+    }
+    accumulator[normalizedKey] = decodeURIComponent(valueParts.join("=").trim() || "");
+    return accumulator;
+  }, {});
+}
+
+function getOrCreateVisitorId(req, res) {
+  const cookies = parseCookieHeader(req);
+  const existing = String(cookies.plh_vid || "").trim();
+  if (existing) {
+    return existing;
+  }
+
+  const visitorId = crypto.randomUUID();
+  res.append(
+    "Set-Cookie",
+    `plh_vid=${encodeURIComponent(visitorId)}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`
+  );
+  return visitorId;
+}
+
+function getTrackedPageLabel(req) {
+  const pathValue = String(req.path || "");
+  if (pathValue === "/" || /^\/stores\/[^/]+$/.test(pathValue)) {
+    return "Home";
+  }
+  if (pathValue === "/shop" || /^\/stores\/[^/]+\/shop$/.test(pathValue)) {
+    return "Shop";
+  }
+  if (pathValue === "/live-selling" || /^\/stores\/[^/]+\/live-selling$/.test(pathValue)) {
+    return "Live Selling";
+  }
+  if (/^\/product\/[^/]+$/.test(pathValue) || /^\/stores\/[^/]+\/product\/[^/]+$/.test(pathValue)) {
+    return "Product Detail";
+  }
+  if (pathValue === "/cart" || /^\/stores\/[^/]+\/cart$/.test(pathValue)) {
+    return "Cart";
+  }
+  if (pathValue === "/login") {
+    return "User Login";
+  }
+  if (pathValue === "/signup") {
+    return "User Signup";
+  }
+  return "";
+}
+
+function getTrackedStoreForRequest(req) {
+  if (String(req.path || "").startsWith("/stores/")) {
+    return getStoreFromSlugOrDefault(req);
+  }
+  return getPlatformDefaultStore();
+}
+
+function shouldTrackSiteVisit(req) {
+  if (req.method !== "GET") {
+    return false;
+  }
+
+  const pathValue = String(req.path || "");
+  if (!pathValue || pathValue.startsWith("/admin") || pathValue.startsWith("/manager") || pathValue.startsWith("/uploads")) {
+    return false;
+  }
+
+  if (/\.[a-z0-9]+$/i.test(pathValue)) {
+    return false;
+  }
+
+  const accept = String(req.headers.accept || "");
+  if (accept && !accept.includes("text/html")) {
+    return false;
+  }
+
+  return Boolean(getTrackedPageLabel(req));
 }
 
 function extractOutputTextFromResponsesApi(payload) {
@@ -1247,6 +1392,10 @@ function toCategoryKey(value) {
     BAG: "BAGS",
     CLOTHING: "CLOTHES",
     CLOTHINGS: "CLOTHES",
+    TRIP: "TRIPS",
+    TRAVEL: "TRIPS",
+    CAR: "CARS",
+    AUTOMOTIVE: "CARS",
     MISC: "MISCELLANEOUS",
     UTENSILS: "MISCELLANEOUS",
   };
@@ -1259,6 +1408,8 @@ function categoryLabelFromKey(value) {
   const labels = {
     CLOTHES: "Clothes",
     BAGS: "Bags",
+    TRIPS: "Trips",
+    CARS: "Cars",
     MISCELLANEOUS: "Miscellaneous",
   };
   return labels[key] || String(value || "").trim();
@@ -1284,6 +1435,11 @@ function sortItems(list, sortBy) {
 
 function getPublicItems(list) {
   return (Array.isArray(list) ? list : []).filter((item) => !item.isBlocked);
+}
+
+function filterItemsByStoreCategories(items, store) {
+  const allowedCategories = new Set(getStoreAvailableCategories(store ? store.id : null));
+  return (Array.isArray(items) ? items : []).filter((item) => allowedCategories.has(String(item.category || "").trim()));
 }
 
 function getResolvedStore(storeLike) {
@@ -1328,15 +1484,10 @@ function getStoreItems(store) {
 }
 
 function buildShopViewModel(req, store) {
-  const items = getPublicItems(getStoreItems(store));
-  const categoryMap = new Map();
-  items.forEach((item) => {
-    const key = toCategoryKey(item.category);
-    if (!categoryMap.has(key)) {
-      categoryMap.set(key, categoryLabelFromKey(item.category));
-    }
-  });
-  const categories = Array.from(categoryMap.values());
+  const allowedCategories = getStoreAvailableCategories(store ? store.id : null);
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(store)), store);
+  const categories = allowedCategories.map((category) => categoryLabelFromKey(category));
+  const categoryMap = new Map(categories.map((category) => [toCategoryKey(category), category]));
 
   const q = String(req.query.q || "").trim();
   const requestedCategoryKey = toCategoryKey(req.query.category || "ALL");
@@ -1405,7 +1556,7 @@ function buildShopViewModel(req, store) {
 
 function renderStoreHome(req, res, store) {
   const activeStore = getResolvedStore(store);
-  const items = getPublicItems(getStoreItems(activeStore));
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(activeStore)), activeStore);
   res.render("index", withStoreContext(activeStore, { items }));
 }
 
@@ -1430,7 +1581,7 @@ function renderStoreShop(req, res, store) {
 function renderStoreProduct(req, res, store) {
   const activeStore = getResolvedStore(store);
   const itemId = String(req.params.itemId || "");
-  const items = getPublicItems(getStoreItems(activeStore));
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(activeStore)), activeStore);
   const item = items.find((entry) => entry.id === itemId);
 
   if (!item) {
@@ -1459,7 +1610,7 @@ function renderStoreProduct(req, res, store) {
 function renderStorePaymentWaiting(req, res, store) {
   const activeStore = getResolvedStore(store);
   const itemId = String(req.params.itemId || "");
-  const items = getPublicItems(getStoreItems(activeStore));
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(activeStore)), activeStore);
   const item = items.find((entry) => entry.id === itemId);
 
   if (!item) {
@@ -1486,7 +1637,7 @@ function renderStorePaymentCallback(req, res, store) {
   const activeStore = getResolvedStore(store);
   const itemId = String(req.query.itemId || "").trim();
   const status = String(req.query.status || "pending").trim().toUpperCase();
-  const items = getPublicItems(getStoreItems(activeStore));
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(activeStore)), activeStore);
   const item = items.find((entry) => entry.id === itemId) || null;
   const statusLabelMap = {
     PAID: "Paid",
@@ -1502,7 +1653,7 @@ function renderStorePaymentCallback(req, res, store) {
 
 function renderStoreCart(req, res, store, extra = {}) {
   const activeStore = getResolvedStore(store);
-  const items = getPublicItems(getStoreItems(activeStore));
+  const items = filterItemsByStoreCategories(getPublicItems(getStoreItems(activeStore)), activeStore);
   const paymongoCheckout = getPaymongoCheckoutLinks(activeStore.id);
   res.render(
     "cart",
@@ -1525,7 +1676,7 @@ function redirectToStoreCategory(store, categoryKey) {
 
 function renderStoreLiveSelling(req, res, store) {
   const activeStore = getResolvedStore(store);
-  const liveItems = getLiveSellingItems(activeStore.id);
+  const liveItems = filterItemsByStoreCategories(getLiveSellingItems(activeStore.id), activeStore);
   res.render(
     "live-selling",
     withStoreContext(activeStore, {
@@ -1678,6 +1829,14 @@ app.get("/shop/bags", (_req, res) => {
   res.redirect("/shop?category=BAGS");
 });
 
+app.get("/shop/trips", (_req, res) => {
+  res.redirect("/shop?category=TRIPS");
+});
+
+app.get("/shop/cars", (_req, res) => {
+  res.redirect("/shop?category=CARS");
+});
+
 app.get("/shop/bugs", (_req, res) => {
   res.redirect("/shop?category=BAGS");
 });
@@ -1692,6 +1851,14 @@ app.get("/clothes", (_req, res) => {
 
 app.get("/bags", (_req, res) => {
   res.redirect("/shop/bags");
+});
+
+app.get("/trips", (_req, res) => {
+  res.redirect("/shop/trips");
+});
+
+app.get("/cars", (_req, res) => {
+  res.redirect("/shop/cars");
 });
 
 app.get("/miscellaneous", (_req, res) => {
@@ -1981,6 +2148,22 @@ app.get("/stores/:slug/shop/bags", (req, res) => {
   res.redirect(redirectToStoreCategory(store, "BAGS"));
 });
 
+app.get("/stores/:slug/shop/trips", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(redirectToStoreCategory(store, "TRIPS"));
+});
+
+app.get("/stores/:slug/shop/cars", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(redirectToStoreCategory(store, "CARS"));
+});
+
 app.get("/stores/:slug/shop/bugs", (req, res) => {
   const store = getStoreOrRedirect(req, res);
   if (!store) {
@@ -2011,6 +2194,22 @@ app.get("/stores/:slug/bags", (req, res) => {
     return;
   }
   res.redirect(`${buildStoreBasePath(store)}/shop/bags`);
+});
+
+app.get("/stores/:slug/trips", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(`${buildStoreBasePath(store)}/shop/trips`);
+});
+
+app.get("/stores/:slug/cars", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(`${buildStoreBasePath(store)}/shop/cars`);
 });
 
 app.get("/stores/:slug/miscellaneous", (req, res) => {
@@ -2728,6 +2927,7 @@ app.post("/admin/items/create", requireStoreOperator, upload.single("productImag
       storeId,
       name: req.body.name,
       category: req.body.category,
+      size: req.body.size,
       price: req.body.price,
       stock: req.body.stock,
       isLiveSelling: String(req.body.isLiveSelling || "") === "1",
@@ -2764,6 +2964,7 @@ app.post("/admin/items/:id/inventory", requireStoreOperator, upload.single("prod
       storeId,
       name: req.body.name,
       category: req.body.category,
+      size: req.body.size,
       price: req.body.price,
       stock: req.body.stock,
       isLiveSelling: String(req.body.isLiveSelling || "") === "1",
@@ -2862,6 +3063,30 @@ app.post("/admin/store-theme", requireStoreOperator, (req, res) => {
     res.redirect(buildOperatorRedirect(req, {
       tab: "appearance",
       error: error.message || "Failed to save store theme.",
+      storeId: getOperatorStoreId(req),
+    }));
+  }
+});
+
+app.post("/admin/store-categories", requireStoreOperator, (req, res) => {
+  try {
+    const storeId = getOperatorStoreId(req);
+    const selectedValues = Array.isArray(req.body.availableCategories)
+      ? req.body.availableCategories
+      : req.body.availableCategories
+        ? [req.body.availableCategories]
+        : [];
+    const savedCategories = saveStoreAvailableCategories(selectedValues, storeId);
+
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "appearance",
+      message: `Available categories updated: ${savedCategories.join(", ")}.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "appearance",
+      error: error.message || "Failed to update store categories.",
       storeId: getOperatorStoreId(req),
     }));
   }
@@ -3069,6 +3294,8 @@ app.post("/admin/stores/create", requireAdmin, (req, res) => {
       description: req.body.description,
       subscriptionPlan: req.body.subscriptionPlan,
       subscriptionStatus: req.body.subscriptionStatus,
+      subscriptionStartedAt: req.body.subscriptionStartedAt,
+      subscriptionDurationDays: req.body.subscriptionDurationDays,
     });
     if (req.session) {
       req.session.activeAdminStoreId = store.id;
@@ -3083,6 +3310,48 @@ app.post("/admin/stores/create", requireAdmin, (req, res) => {
       tab: "stores",
       error: error.message || "Failed to create store.",
       storeId: getOperatorStoreId(req),
+    }));
+  }
+});
+
+app.post("/admin/store-subscriptions/update", requireAdmin, (req, res) => {
+  try {
+    const storeId = Number(req.body.storeId || getOperatorStoreId(req));
+    const store = updateStoreSubscription({
+      storeId,
+      subscriptionPlan: req.body.subscriptionPlan,
+      subscriptionStatus: req.body.subscriptionStatus,
+      subscriptionStartedAt: req.body.subscriptionStartedAt,
+      subscriptionDurationDays: req.body.subscriptionDurationDays,
+    });
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "subscriptions",
+      message: `Subscription updated for ${store.name}.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "subscriptions",
+      error: error.message || "Failed to update subscription.",
+      storeId: Number(req.body.storeId || getOperatorStoreId(req)),
+    }));
+  }
+});
+
+app.post("/admin/store-subscriptions/remove", requireAdmin, (req, res) => {
+  try {
+    const storeId = Number(req.body.storeId || getOperatorStoreId(req));
+    const store = clearStoreSubscription(storeId);
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "subscriptions",
+      message: `Subscription removed for ${store.name}.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "subscriptions",
+      error: error.message || "Failed to remove subscription.",
+      storeId: Number(req.body.storeId || getOperatorStoreId(req)),
     }));
   }
 });

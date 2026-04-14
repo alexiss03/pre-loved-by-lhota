@@ -84,6 +84,9 @@
     Direct Links
   </button>
   <% if (isPlatformAdmin) { %>
+    <button type="button" class="admin-tab-button" data-admin-tab-trigger="subscriptions" role="tab" aria-selected="false">
+      Subscriptions
+    </button>
     <button type="button" class="admin-tab-button" data-admin-tab-trigger="stores" role="tab" aria-selected="false">
       Stores
     </button>
@@ -179,6 +182,30 @@
       </article>
     <% }) %>
   </div>
+
+  <section class="card" style="margin-top: 1rem;">
+    <h3>Available Categories</h3>
+    <p class="muted">Choose which categories this store can use in inventory and show on the storefront.</p>
+
+    <form class="inventory-create-form" action="/admin/store-categories" method="POST">
+      <div class="inventory-form-grid">
+        <% allStoreCategories.forEach((category) => { %>
+          <label class="inline-choice">
+            <input
+              type="checkbox"
+              name="availableCategories"
+              value="<%= category %>"
+              <%= inventoryCategories.includes(category) ? "checked" : "" %>
+            />
+            <span><%= category %></span>
+          </label>
+        <% }) %>
+      </div>
+      <div class="inventory-actions">
+        <button type="submit" class="button button-primary">Save Categories</button>
+      </div>
+    </form>
+  </section>
 </section>
 
 <% if (isPlatformAdmin) { %>
@@ -209,6 +236,12 @@
             <option value="PAST_DUE">Past Due</option>
             <option value="PAUSED">Paused</option>
           </select>
+
+          <label for="subscriptionStartedAt">Subscription Start</label>
+          <input id="subscriptionStartedAt" name="subscriptionStartedAt" type="date" value="<%= todayDateInput %>" />
+
+          <label for="subscriptionDurationDays">Duration (days)</label>
+          <input id="subscriptionDurationDays" name="subscriptionDurationDays" type="number" min="1" step="1" placeholder="30" />
 
           <button type="submit" class="button button-primary">Create Store</button>
         </form>
@@ -246,8 +279,79 @@
           <h3><%= storeOption.name %></h3>
           <p class="muted">Slug: <code><%= storeOption.slug %></code></p>
           <p class="muted">Plan: <strong><%= storeOption.subscriptionPlan %></strong> / <%= storeOption.subscriptionStatus %></p>
+          <p class="muted">Duration: <%= storeOption.subscriptionDurationDays || 0 %> day(s) / Ends: <%= storeOption.subscriptionEndsAt || "Not set" %></p>
           <p class="muted">Manager: <%= storeOption.manager ? (storeOption.manager.fullName || storeOption.manager.email) : "Not assigned" %></p>
           <p class="muted">URL: <a href="/stores/<%= encodeURIComponent(storeOption.slug) %>" target="_blank" rel="noreferrer">/stores/<%= storeOption.slug %></a></p>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+<% } %>
+
+<% if (isPlatformAdmin) { %>
+  <section class="card admin-tab-panel" data-admin-tab="subscriptions">
+    <h2>Subscriptions</h2>
+    <p class="muted">Add, update, or remove the subscription assigned to each store. Duration is managed in days and the end date is computed automatically.</p>
+
+    <div class="analytics-grid analytics-grid-secondary">
+      <% stores.forEach((storeOption) => { %>
+        <article class="card analytics-panel">
+          <h3><%= storeOption.name %></h3>
+          <p class="muted">Current plan: <strong><%= storeOption.subscriptionPlan || "None" %></strong></p>
+          <p class="muted">Status: <strong><%= storeOption.subscriptionStatus || "NONE" %></strong></p>
+          <p class="muted">Duration: <strong><%= storeOption.subscriptionDurationDays || 0 %></strong> day(s)</p>
+          <p class="muted">Ends on: <strong><%= storeOption.subscriptionEndsAt || "Not set" %></strong></p>
+
+          <form class="inventory-create-form" action="/admin/store-subscriptions/update" method="POST">
+            <input type="hidden" name="storeId" value="<%= storeOption.id %>" />
+
+            <label for="sub-plan-<%= storeOption.id %>">Subscription Plan</label>
+            <input
+              id="sub-plan-<%= storeOption.id %>"
+              name="subscriptionPlan"
+              value="<%= storeOption.subscriptionPlan && storeOption.subscriptionPlan !== 'None' ? storeOption.subscriptionPlan : '' %>"
+              placeholder="Starter / Premium / Enterprise"
+              required
+            />
+
+            <label for="sub-status-<%= storeOption.id %>">Subscription Status</label>
+            <select id="sub-status-<%= storeOption.id %>" name="subscriptionStatus">
+              <option value="ACTIVE" <%= storeOption.subscriptionStatus === "ACTIVE" ? "selected" : "" %>>Active</option>
+              <option value="TRIAL" <%= storeOption.subscriptionStatus === "TRIAL" ? "selected" : "" %>>Trial</option>
+              <option value="PAST_DUE" <%= storeOption.subscriptionStatus === "PAST_DUE" ? "selected" : "" %>>Past Due</option>
+              <option value="PAUSED" <%= storeOption.subscriptionStatus === "PAUSED" ? "selected" : "" %>>Paused</option>
+              <option value="CANCELED" <%= storeOption.subscriptionStatus === "CANCELED" ? "selected" : "" %>>Canceled</option>
+              <option value="EXPIRED" <%= storeOption.subscriptionStatus === "EXPIRED" ? "selected" : "" %>>Expired</option>
+            </select>
+
+            <label for="sub-start-<%= storeOption.id %>">Subscription Start</label>
+            <input
+              id="sub-start-<%= storeOption.id %>"
+              name="subscriptionStartedAt"
+              type="date"
+              value="<%= storeOption.subscriptionStartedAt || todayDateInput %>"
+            />
+
+            <label for="sub-duration-<%= storeOption.id %>">Duration (days)</label>
+            <input
+              id="sub-duration-<%= storeOption.id %>"
+              name="subscriptionDurationDays"
+              type="number"
+              min="1"
+              step="1"
+              value="<%= storeOption.subscriptionDurationDays || '' %>"
+              placeholder="30"
+            />
+
+            <div class="inventory-actions">
+              <button type="submit" class="button button-primary">Save Subscription</button>
+            </div>
+          </form>
+
+          <form action="/admin/store-subscriptions/remove" method="POST" style="margin-top: 0.75rem;">
+            <input type="hidden" name="storeId" value="<%= storeOption.id %>" />
+            <button type="submit" class="button button-danger">Remove Subscription</button>
+          </form>
         </article>
       <% }) %>
     </div>
@@ -278,6 +382,16 @@
       <span class="analytics-label">Active Items</span>
       <strong><%= analytics.activeItemCount %></strong>
       <p class="muted"><%= analytics.blockedItemCount %> blocked item(s).</p>
+    </article>
+    <article class="card analytics-card">
+      <span class="analytics-label">Site Visits</span>
+      <strong><%= analytics.siteVisits.totalVisits %></strong>
+      <p class="muted"><%= analytics.siteVisits.todayVisits %> visit(s) today.</p>
+    </article>
+    <article class="card analytics-card">
+      <span class="analytics-label">Unique Visitors</span>
+      <strong><%= analytics.siteVisits.uniqueVisitors %></strong>
+      <p class="muted"><%= analytics.siteVisits.todayUniqueVisitors %> unique today.</p>
     </article>
   </div>
 
@@ -350,6 +464,40 @@
             <div class="analytics-row">
               <span><%= entry.name %> (<%= entry.units %> pcs)</span>
               <strong><%= formatCurrency(entry.revenue) %></strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="analytics-grid analytics-grid-secondary">
+    <section class="card analytics-panel">
+      <h3>Top Pages</h3>
+      <% if (analytics.siteVisits.topPages.length === 0) { %>
+        <p class="muted">No page visits tracked yet.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.siteVisits.topPages.forEach((entry) => { %>
+            <div class="analytics-row">
+              <span><%= entry.label %></span>
+              <strong><%= entry.visits %></strong>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="card analytics-panel">
+      <h3>Recent Traffic</h3>
+      <% if (analytics.siteVisits.recentDaily.length === 0) { %>
+        <p class="muted">No daily traffic yet.</p>
+      <% } else { %>
+        <div class="analytics-list">
+          <% analytics.siteVisits.recentDaily.forEach((entry) => { %>
+            <div class="analytics-row">
+              <span><%= entry.date %> • <%= entry.uniqueVisitors %> unique</span>
+              <strong><%= entry.visits %></strong>
             </div>
           <% }) %>
         </div>
@@ -537,6 +685,10 @@
           <input id="new-item-stock" name="stock" type="number" min="0" step="1" required />
         </div>
         <div>
+          <label for="new-item-size">Size</label>
+          <input id="new-item-size" name="size" maxlength="40" placeholder="XS, Small, Medium, 28, etc." />
+        </div>
+        <div>
           <label for="new-item-live-toggle">Include in Live Selling</label>
           <select id="new-item-live-toggle" name="isLiveSelling">
             <option value="0" selected>No</option>
@@ -590,7 +742,7 @@
         <div class="inventory-item-head">
           <div>
             <strong><%= item.id %> - <%= item.name %></strong>
-            <p class="muted"><%= item.category %> | <%= formatCurrency(item.price) %> | Stock: <%= item.stock %></p>
+            <p class="muted"><%= item.category %><% if (item.size) { %> | Size: <%= item.size %><% } %> | <%= formatCurrency(item.price) %> | Stock: <%= item.stock %></p>
           </div>
           <div class="inventory-actions">
             <span class="status <%= item.isBlocked ? 'needs-attention' : 'paid' %>"><%= item.isBlocked ? "Blocked" : "Active" %></span>
@@ -612,7 +764,8 @@
             <div>
               <label for="inv-category-<%= item.id %>">Category</label>
               <select id="inv-category-<%= item.id %>" name="category" required>
-                <% inventoryCategories.forEach((category) => { %>
+                <% const editableCategories = inventoryCategories.includes(item.category) ? inventoryCategories : [...inventoryCategories, item.category]; %>
+                <% editableCategories.forEach((category) => { %>
                   <option value="<%= category %>" <%= item.category === category ? "selected" : "" %>><%= category %></option>
                 <% }) %>
               </select>
@@ -624,6 +777,10 @@
             <div>
               <label for="inv-stock-<%= item.id %>">Stock</label>
               <input id="inv-stock-<%= item.id %>" name="stock" type="number" min="0" step="1" value="<%= item.stock %>" required />
+            </div>
+            <div>
+              <label for="inv-size-<%= item.id %>">Size</label>
+              <input id="inv-size-<%= item.id %>" name="size" maxlength="40" value="<%= item.size || '' %>" placeholder="XS, Small, Medium, 28, etc." />
             </div>
             <div>
               <label for="inv-live-toggle-<%= item.id %>">Include in Live Selling</label>
@@ -712,7 +869,7 @@
 
       <ul class="order-items">
         <% order.items.forEach((item) => { %>
-          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+          <li><%= item.name %><% if (item.size) { %> (Size: <%= item.size %>)<% } %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
         <% }) %>
       </ul>
 
@@ -753,7 +910,7 @@
 
       <ul class="order-items">
         <% order.items.forEach((item) => { %>
-          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+          <li><%= item.name %><% if (item.size) { %> (Size: <%= item.size %>)<% } %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
         <% }) %>
       </ul>
 
@@ -792,7 +949,7 @@
 
       <ul class="order-items">
         <% order.items.forEach((item) => { %>
-          <li><%= item.name %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
+          <li><%= item.name %><% if (item.size) { %> (Size: <%= item.size %>)<% } %> x<%= item.quantity %> - <%= formatCurrency(item.subtotal) %></li>
         <% }) %>
       </ul>
 
@@ -854,7 +1011,7 @@
       <p><strong>Buyer:</strong> <%= order.buyerName %> | <%= order.buyerEmail %></p>
       <p><strong>Archived At:</strong> <%= order.archivedAt ? formatDate(order.archivedAt) : "-" %></p>
       <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
-      <p><strong>Items:</strong> <%= order.items.map((item) => `${item.name} x${item.quantity}`).join(", ") %></p>
+      <p><strong>Items:</strong> <%= order.items.map((item) => `${item.name}${item.size ? ` (Size: ${item.size})` : ""} x${item.quantity}`).join(", ") %></p>
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/unarchive" method="POST">
           <button type="submit" class="button button-secondary">Unarchive</button>
