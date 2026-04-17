@@ -1236,6 +1236,38 @@ body[data-store-theme="pristie"] .pristie-footer-band .button {
   box-shadow: var(--shadow-card);
 }
 
+.product-detail-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.product-detail-thumb {
+  appearance: none;
+  border: 1px solid rgba(194, 173, 157, 0.34);
+  border-radius: 18px;
+  padding: 0.2rem;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-detail-thumb:hover,
+.product-detail-thumb.is-active {
+  transform: translateY(-1px);
+  border-color: rgba(60, 50, 43, 0.42);
+  box-shadow: 0 14px 24px rgba(45, 35, 29, 0.12);
+}
+
+.product-detail-thumb img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+
 .product-main-body h2 {
   margin: 0.35rem 0 0.4rem;
   font-family: "Playfair Display", Georgia, serif;

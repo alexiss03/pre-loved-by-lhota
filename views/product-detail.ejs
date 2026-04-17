@@ -1,5 +1,9 @@
 <%- include('partials/header', { title: `${item.name} - ${storeName || "Pre-loved by Lhota"}`, meta, storeBasePath, storeName, storeCartKey, storeThemeKey }) %>
 
+<%
+  const productImages = Array.isArray(item.imageUrls) && item.imageUrls.length > 0 ? item.imageUrls : [item.imageUrl];
+%>
+
 <section class="section-head product-detail-head">
   <p><a class="breadcrumb-link" href="<%= storeBasePath %>/shop">Shop</a> / <span><%= item.category %></span></p>
   <h1><%= item.name %></h1>
@@ -11,7 +15,21 @@
 
 <section class="product-detail-layout">
   <div class="product-detail-image">
-    <img src="<%= item.imageUrl %>" alt="<%= item.name %>" />
+    <img id="product-detail-main-image" src="<%= productImages[0] %>" alt="<%= item.name %>" />
+    <% if (productImages.length > 1) { %>
+      <div class="product-detail-thumbs">
+        <% productImages.forEach((imageUrl, index) => { %>
+          <button
+            type="button"
+            class="product-detail-thumb <%= index === 0 ? 'is-active' : '' %>"
+            data-product-image="<%= imageUrl %>"
+            aria-label="View photo <%= index + 1 %>"
+          >
+            <img src="<%= imageUrl %>" alt="<%= item.name %> photo <%= index + 1 %>" />
+          </button>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 
   <div class="card item-card-body product-main-body">
@@ -97,6 +115,25 @@
   window.ITEM_CATALOG = <%- allItemsJson %>;
   window.STORE_BASE_PATH = <%- JSON.stringify(storeBasePath || "") %>;
   window.STORE_CART_KEY = <%- JSON.stringify(storeCartKey || "preloved_cart") %>;
+  (function () {
+    const mainImage = document.getElementById("product-detail-main-image");
+    const thumbButtons = Array.from(document.querySelectorAll("[data-product-image]"));
+    if (!mainImage || thumbButtons.length === 0) {
+      return;
+    }
+
+    thumbButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextImage = button.getAttribute("data-product-image");
+        if (!nextImage) {
+          return;
+        }
+        mainImage.src = nextImage;
+        thumbButtons.forEach((entry) => entry.classList.remove("is-active"));
+        button.classList.add("is-active");
+      });
+    });
+  })();
 </script>
 <script src="/js/storefront.js"></script>
 

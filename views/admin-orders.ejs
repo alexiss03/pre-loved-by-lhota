@@ -686,7 +686,12 @@
         </div>
         <div>
           <label for="new-item-size">Size</label>
-          <input id="new-item-size" name="size" maxlength="40" placeholder="XS, Small, Medium, 28, etc." />
+          <select id="new-item-size" name="size">
+            <option value="">No size</option>
+            <% itemSizeOptions.forEach((sizeOption) => { %>
+              <option value="<%= sizeOption %>"><%= sizeOption %></option>
+            <% }) %>
+          </select>
         </div>
         <div>
           <label for="new-item-live-toggle">Include in Live Selling</label>
@@ -704,13 +709,13 @@
           <input id="new-item-live-label" name="liveSellingLabel" maxlength="50" placeholder="e.g. Mine 12 / Slot A / LS-03" />
         </div>
         <div class="inventory-grid-span">
-          <label for="new-item-image">Image URL</label>
-          <input id="new-item-image" name="imageUrl" type="url" placeholder="https://..." />
+          <label for="new-item-images">Image URLs</label>
+          <textarea id="new-item-images" name="imageUrls" rows="3" placeholder="One image URL per line"></textarea>
         </div>
         <div class="inventory-grid-span">
-          <label for="new-item-photo">Upload Photo</label>
-          <input id="new-item-photo" name="productImage" type="file" accept="image/*" />
-          <p class="muted">Upload a photo or paste an image URL.</p>
+          <label for="new-item-photo">Upload Photos</label>
+          <input id="new-item-photo" name="productImages" type="file" accept="image/*" multiple />
+          <p class="muted">Upload multiple photos or paste multiple image URLs.</p>
         </div>
         <div>
           <label for="new-item-image-process-mode">Photo Cleanup</label>
@@ -780,7 +785,12 @@
             </div>
             <div>
               <label for="inv-size-<%= item.id %>">Size</label>
-              <input id="inv-size-<%= item.id %>" name="size" maxlength="40" value="<%= item.size || '' %>" placeholder="XS, Small, Medium, 28, etc." />
+              <select id="inv-size-<%= item.id %>" name="size">
+                <option value="">No size</option>
+                <% itemSizeOptions.forEach((sizeOption) => { %>
+                  <option value="<%= sizeOption %>" <%= item.size === sizeOption ? "selected" : "" %>><%= sizeOption %></option>
+                <% }) %>
+              </select>
             </div>
             <div>
               <label for="inv-live-toggle-<%= item.id %>">Include in Live Selling</label>
@@ -798,14 +808,14 @@
               <input id="inv-live-label-<%= item.id %>" name="liveSellingLabel" maxlength="50" value="<%= item.liveSellingLabel || '' %>" placeholder="e.g. Mine 12 / Slot A / LS-03" />
             </div>
             <div class="inventory-grid-span">
-              <label for="inv-image-<%= item.id %>">Image URL</label>
-              <input id="inv-image-<%= item.id %>" name="imageUrl" type="url" value="<%= item.imageUrl %>" />
-              <input name="currentImageUrl" type="hidden" value="<%= item.imageUrl %>" />
+              <label for="inv-image-<%= item.id %>">Image URLs</label>
+              <textarea id="inv-image-<%= item.id %>" name="imageUrls" rows="3"><%= (Array.isArray(item.imageUrls) && item.imageUrls.length > 0 ? item.imageUrls : [item.imageUrl]).filter(Boolean).join('\n') %></textarea>
+              <input name="currentImageUrls" type="hidden" value="<%= (Array.isArray(item.imageUrls) && item.imageUrls.length > 0 ? item.imageUrls : [item.imageUrl]).filter(Boolean).join('\n') %>" />
             </div>
             <div class="inventory-grid-span">
-              <label for="inv-photo-<%= item.id %>">Upload New Photo</label>
-              <input id="inv-photo-<%= item.id %>" name="productImage" type="file" accept="image/*" />
-              <p class="muted">Leave blank to keep the current photo.</p>
+              <label for="inv-photo-<%= item.id %>">Upload New Photos</label>
+              <input id="inv-photo-<%= item.id %>" name="productImages" type="file" accept="image/*" multiple />
+              <p class="muted">Leave blank to keep the current photo gallery.</p>
             </div>
             <div>
               <label for="inv-image-process-mode-<%= item.id %>">Photo Cleanup</label>
@@ -873,6 +883,14 @@
         <% }) %>
       </ul>
 
+      <form action="/admin/orders/<%= order.id %>/internal-note" method="POST" class="inventory-edit-form">
+        <label for="internal-note-pending-<%= order.id %>">Internal Admin Note</label>
+        <textarea id="internal-note-pending-<%= order.id %>" name="internalNote" rows="3" placeholder="Private note for packing, follow-up, courier, or buyer concerns."><%= order.internalNote || "" %></textarea>
+        <div class="inventory-actions">
+          <button type="submit" class="button button-secondary">Save Note</button>
+        </div>
+      </form>
+
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/status" method="POST">
           <input type="hidden" name="nextStatus" value="PAID" />
@@ -914,6 +932,14 @@
         <% }) %>
       </ul>
 
+      <form action="/admin/orders/<%= order.id %>/internal-note" method="POST" class="inventory-edit-form">
+        <label for="internal-note-paid-<%= order.id %>">Internal Admin Note</label>
+        <textarea id="internal-note-paid-<%= order.id %>" name="internalNote" rows="3" placeholder="Private note for packing, follow-up, courier, or buyer concerns."><%= order.internalNote || "" %></textarea>
+        <div class="inventory-actions">
+          <button type="submit" class="button button-secondary">Save Note</button>
+        </div>
+      </form>
+
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/status" method="POST">
           <input type="hidden" name="nextStatus" value="FOR_DELIVERY" />
@@ -953,6 +979,14 @@
         <% }) %>
       </ul>
 
+      <form action="/admin/orders/<%= order.id %>/internal-note" method="POST" class="inventory-edit-form">
+        <label for="internal-note-delivery-<%= order.id %>">Internal Admin Note</label>
+        <textarea id="internal-note-delivery-<%= order.id %>" name="internalNote" rows="3" placeholder="Private note for packing, follow-up, courier, or buyer concerns."><%= order.internalNote || "" %></textarea>
+        <div class="inventory-actions">
+          <button type="submit" class="button button-secondary">Save Note</button>
+        </div>
+      </form>
+
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/status" method="POST">
           <input type="hidden" name="nextStatus" value="RECEIVED" />
@@ -983,6 +1017,13 @@
       <p><strong>Received At:</strong> <%= order.receivedAt ? formatDate(order.receivedAt) : "-" %></p>
       <p><strong>Delivery Area:</strong> <%= formatDeliveryArea(order.deliveryArea) %></p>
       <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
+      <form action="/admin/orders/<%= order.id %>/internal-note" method="POST" class="inventory-edit-form">
+        <label for="internal-note-received-<%= order.id %>">Internal Admin Note</label>
+        <textarea id="internal-note-received-<%= order.id %>" name="internalNote" rows="3" placeholder="Private note for packing, follow-up, courier, or buyer concerns."><%= order.internalNote || "" %></textarea>
+        <div class="inventory-actions">
+          <button type="submit" class="button button-secondary">Save Note</button>
+        </div>
+      </form>
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/archive" method="POST">
           <button type="submit" class="button button-secondary">Archive</button>
@@ -1012,6 +1053,13 @@
       <p><strong>Archived At:</strong> <%= order.archivedAt ? formatDate(order.archivedAt) : "-" %></p>
       <p><strong>Grand Total:</strong> <%= formatCurrency(order.grandTotal || order.totalAmount) %></p>
       <p><strong>Items:</strong> <%= order.items.map((item) => `${item.name}${item.size ? ` (Size: ${item.size})` : ""} x${item.quantity}`).join(", ") %></p>
+      <form action="/admin/orders/<%= order.id %>/internal-note" method="POST" class="inventory-edit-form">
+        <label for="internal-note-archived-<%= order.id %>">Internal Admin Note</label>
+        <textarea id="internal-note-archived-<%= order.id %>" name="internalNote" rows="3" placeholder="Private note for packing, follow-up, courier, or buyer concerns."><%= order.internalNote || "" %></textarea>
+        <div class="inventory-actions">
+          <button type="submit" class="button button-secondary">Save Note</button>
+        </div>
+      </form>
       <div class="order-actions">
         <form action="/admin/orders/<%= order.id %>/unarchive" method="POST">
           <button type="submit" class="button button-secondary">Unarchive</button>

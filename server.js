@@ -16,6 +16,7 @@ const {
   ORDER_STATUSES,
   DEFAULT_FACEBOOK_AUTO_POST,
   ITEM_CATEGORIES,
+  ITEM_SIZE_OPTIONS,
   ensureDataFile,
   getStores,
   getStoreById,
@@ -56,6 +57,7 @@ const {
   updateItemLiveSelling,
   approveOrder,
   updateOrderStatus,
+  updateOrderInternalNote,
   archiveOrder,
   unarchiveOrder,
   deleteOrder,
@@ -288,6 +290,10 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024,
   },
 });
+const itemUpload = upload.fields([
+  { name: "productImage", maxCount: 1 },
+  { name: "productImages", maxCount: 8 },
+]);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -563,6 +569,7 @@ async function renderOperatorDashboard(req, res) {
     inventoryItems,
     liveSellingItems,
     inventoryCategories: storeAvailableCategories,
+    itemSizeOptions: [...ITEM_SIZE_OPTIONS],
     allStoreCategories: [...ALL_ITEM_CATEGORIES],
     analytics,
     paymongoCheckout,
@@ -897,6 +904,44 @@ async function resolveItemImageInput({ file, imageUrl, fallbackImageUrl = "", im
   }
 
   throw new Error("Please upload a photo or provide an image URL.");
+}
+
+function getItemUploadFiles(req) {
+  const filesByField = req && req.files && typeof req.files === "object" ? req.files : {};
+  const singleFiles = Array.isArray(filesByField.productImage) ? filesByField.productImage : [];
+  const multipleFiles = Array.isArray(filesByField.productImages) ? filesByField.productImages : [];
+  return [...singleFiles, ...multipleFiles].filter(Boolean);
+}
+
+function parseImageUrlList(value) {
+  return String(value || "")
+    .split(/\r?\n|,/)
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
+}
+
+async function resolveItemImageInputs({ files = [], imageUrlsText = "", fallbackImageUrls = [], imageProcessMode = "" }) {
+  const normalizedFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+  const uploadedUrls = [];
+
+  for (const file of normalizedFiles) {
+    const nextFile = await processItemUploadImage(file, imageProcessMode);
+    uploadedUrls.push(await storeUploadedFile({ file: nextFile, folder: "items" }));
+  }
+
+  const typedImageUrls = parseImageUrlList(imageUrlsText);
+  const existingImageUrls = Array.isArray(fallbackImageUrls)
+    ? fallbackImageUrls.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : parseImageUrlList(fallbackImageUrls);
+
+  const combined = [...typedImageUrls, ...uploadedUrls];
+  const finalUrls = combined.length > 0 ? combined : existingImageUrls;
+
+  if (finalUrls.length === 0) {
+    throw new Error("Please upload at least one photo or provide at least one image URL.");
+  }
+
+  return [...new Set(finalUrls)];
 }
 
 function buildAdminAnalytics({ orders, items, siteVisits }) {
@@ -2920,9 +2965,14 @@ app.post("/admin/paymongo/amount-links/:amount/delete", requireStoreOperator, (r
   }
 });
 
-app.post("/admin/items/create", requireStoreOperator, upload.single("productImage"), async (req, res) => {
+app.post("/admin/items/create", requireStoreOperator, itemUpload, async (req, res) => {
   try {
     const storeId = getOperatorStoreId(req);
+    const imageUrls = await resolveItemImageInputs({
+      files: getItemUploadFiles(req),
+      imageUrlsText: req.body.imageUrls,
+      imageProcessMode: req.body.imageProcessMode,
+    });
     const item = createItem({
       storeId,
       name: req.body.name,
@@ -2934,11 +2984,8 @@ app.post("/admin/items/create", requireStoreOperator, upload.single("productImag
       liveSellingOrder: req.body.liveSellingOrder,
       liveSellingLabel: req.body.liveSellingLabel,
       description: req.body.description,
-      imageUrl: await resolveItemImageInput({
-        file: req.file,
-        imageUrl: req.body.imageUrl,
-        imageProcessMode: req.body.imageProcessMode,
-      }),
+      imageUrl: imageUrls[0],
+      imageUrls,
       paymongoLink: req.body.paymongoLink,
     });
 
@@ -2956,10 +3003,16 @@ app.post("/admin/items/create", requireStoreOperator, upload.single("productImag
   }
 });
 
-app.post("/admin/items/:id/inventory", requireStoreOperator, upload.single("productImage"), async (req, res) => {
+app.post("/admin/items/:id/inventory", requireStoreOperator, itemUpload, async (req, res) => {
   try {
     const storeId = getOperatorStoreId(req);
     const itemId = String(req.params.id || "");
+    const imageUrls = await resolveItemImageInputs({
+      files: getItemUploadFiles(req),
+      imageUrlsText: req.body.imageUrls,
+      fallbackImageUrls: req.body.currentImageUrls,
+      imageProcessMode: req.body.imageProcessMode,
+    });
     const item = updateItemInventory(itemId, {
       storeId,
       name: req.body.name,
@@ -2971,12 +3024,8 @@ app.post("/admin/items/:id/inventory", requireStoreOperator, upload.single("prod
       liveSellingOrder: req.body.liveSellingOrder,
       liveSellingLabel: req.body.liveSellingLabel,
       description: req.body.description,
-      imageUrl: await resolveItemImageInput({
-        file: req.file,
-        imageUrl: req.body.imageUrl,
-        fallbackImageUrl: req.body.currentImageUrl,
-        imageProcessMode: req.body.imageProcessMode,
-      }),
+      imageUrl: imageUrls[0],
+      imageUrls,
     });
 
     res.redirect(buildOperatorRedirect(req, {
@@ -3231,6 +3280,24 @@ app.post("/admin/orders/:id/status", requireStoreOperator, async (req, res) => {
   } catch (error) {
     res.redirect(buildOperatorRedirect(req, {
       error: error.message || "Failed to update order status.",
+      storeId: getOperatorStoreId(req),
+    }));
+  }
+});
+
+app.post("/admin/orders/:id/internal-note", requireStoreOperator, (req, res) => {
+  try {
+    const storeId = getOperatorStoreId(req);
+    const order = updateOrderInternalNote(req.params.id, req.body.internalNote, storeId);
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "orders",
+      message: `Internal note saved for order #${order.id}.`,
+      storeId,
+    }));
+  } catch (error) {
+    res.redirect(buildOperatorRedirect(req, {
+      tab: "orders",
+      error: error.message || "Failed to save internal note.",
       storeId: getOperatorStoreId(req),
     }));
   }

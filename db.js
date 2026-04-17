@@ -42,6 +42,23 @@ const ITEM_CATEGORIES = Object.freeze({
   MISCELLANEOUS: "Miscellaneous",
 });
 const ALL_ITEM_CATEGORIES = Object.freeze(Object.values(ITEM_CATEGORIES));
+const ITEM_SIZE_OPTIONS = Object.freeze([
+  "XS",
+  "Small",
+  "Medium",
+  "Large",
+  "XL",
+  "XXL",
+  "Free Size",
+  "26",
+  "28",
+  "30",
+  "32",
+  "34",
+  "36",
+  "38",
+  "40",
+]);
 const ORDER_STATUS_TRANSITIONS = Object.freeze({
   [ORDER_STATUSES.PENDING]: [ORDER_STATUSES.PAID],
   [ORDER_STATUSES.PAID]: [ORDER_STATUSES.FOR_DELIVERY],
@@ -751,6 +768,12 @@ function normalizeOrders(store) {
       order.deliveryAddressLine = "";
       hasChanges = true;
     }
+
+    const normalizedInternalNote = String(order.internalNote || "").trim().replace(/\s+/g, " ");
+    if (!Object.prototype.hasOwnProperty.call(order, "internalNote") || order.internalNote !== normalizedInternalNote) {
+      order.internalNote = normalizedInternalNote;
+      hasChanges = true;
+    }
   }
 
   return hasChanges;
@@ -804,6 +827,23 @@ function normalizeItems(store) {
     const normalizedSize = normalizeItemSize(item.size || "");
     if (item.size !== normalizedSize) {
       item.size = normalizedSize;
+      hasChanges = true;
+    }
+
+    let normalizedImageUrls;
+    try {
+      normalizedImageUrls = normalizeItemImageUrls(item.imageUrls || item.imageUrl);
+    } catch (_error) {
+      normalizedImageUrls = item.imageUrl ? [String(item.imageUrl).trim()] : [];
+    }
+
+    const nextPrimaryImageUrl = normalizedImageUrls[0] || "";
+    if (JSON.stringify(item.imageUrls || []) !== JSON.stringify(normalizedImageUrls)) {
+      item.imageUrls = normalizedImageUrls;
+      hasChanges = true;
+    }
+    if (item.imageUrl !== nextPrimaryImageUrl) {
+      item.imageUrl = nextPrimaryImageUrl;
       hasChanges = true;
     }
   }
@@ -1442,8 +1482,8 @@ function normalizeItemSize(value) {
   if (!normalized) {
     return "";
   }
-  if (normalized.length > 40) {
-    throw new Error("Size is too long.");
+  if (!ITEM_SIZE_OPTIONS.includes(normalized)) {
+    throw new Error("Please choose a valid size from the dropdown.");
   }
   return normalized;
 }
@@ -1469,6 +1509,27 @@ function normalizeItemImageUrl(value) {
   if (!normalized) {
     throw new Error("Image URL is required.");
   }
+  return normalized;
+}
+
+function normalizeItemImageUrls(values) {
+  const list = Array.isArray(values) ? values : [values];
+  const normalized = [];
+
+  for (const value of list) {
+    const text = String(value || "").trim();
+    if (!text) {
+      continue;
+    }
+    if (!normalized.includes(text)) {
+      normalized.push(text);
+    }
+  }
+
+  if (normalized.length === 0) {
+    throw new Error("At least one image is required.");
+  }
+
   return normalized;
 }
 
@@ -1524,6 +1585,7 @@ function createItem(payload) {
     throw new Error("Store not found.");
   }
   const category = normalizeItemCategory(payload.category);
+  const imageUrls = normalizeItemImageUrls(payload.imageUrls || payload.imageUrl);
   const item = {
     id: generateNextItemId(store, category),
     storeId,
@@ -1538,7 +1600,8 @@ function createItem(payload) {
     isLiveSelling: normalizeLiveSellingFlag(payload.isLiveSelling),
     liveSellingOrder: normalizeLiveSellingOrder(payload.liveSellingOrder),
     liveSellingLabel: normalizeLiveSellingLabel(payload.liveSellingLabel),
-    imageUrl: normalizeItemImageUrl(payload.imageUrl),
+    imageUrl: imageUrls[0],
+    imageUrls,
   };
 
   store.items.push(item);
@@ -1563,6 +1626,8 @@ function updateItemInventory(itemId, payload) {
     throw new Error("Item not found.");
   }
 
+  const imageUrls = normalizeItemImageUrls(payload.imageUrls || payload.imageUrl);
+
   item.name = normalizeItemName(payload.name);
   item.category = normalizeItemCategory(payload.category);
   item.size = normalizeItemSize(payload.size);
@@ -1572,7 +1637,8 @@ function updateItemInventory(itemId, payload) {
   item.isLiveSelling = normalizeLiveSellingFlag(payload.isLiveSelling);
   item.liveSellingOrder = normalizeLiveSellingOrder(payload.liveSellingOrder);
   item.liveSellingLabel = normalizeLiveSellingLabel(payload.liveSellingLabel);
-  item.imageUrl = normalizeItemImageUrl(payload.imageUrl);
+  item.imageUrl = imageUrls[0];
+  item.imageUrls = imageUrls;
   writeStore(store);
   return item;
 }
@@ -1707,6 +1773,14 @@ function getOrderById(orderId, storeId = null) {
     }
     return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
   }) || null;
+}
+
+function normalizeOrderInternalNote(value) {
+  const normalized = String(value || "").trim().replace(/\s+/g, " ");
+  if (normalized.length > 2000) {
+    throw new Error("Internal note is too long.");
+  }
+  return normalized;
 }
 
 function getAdminNotificationSettings(storeId = null) {
@@ -2182,6 +2256,7 @@ function createOrder(payload) {
     receivedAt: null,
     emailNotifiedAt: null,
     pendingReminderNotifiedAt: null,
+    internalNote: "",
     isArchived: false,
     archivedAt: null,
     items: orderItems,
@@ -2275,6 +2350,27 @@ function updateOrderStatus(orderId, nextStatus, storeId = null) {
     order.receivedAt = now;
   }
 
+  writeStore(store);
+  return order;
+}
+
+function updateOrderInternalNote(orderId, internalNote, storeId = null) {
+  const store = readStore();
+  const order = store.orders.find((entry) => {
+    if (entry.id !== Number(orderId)) {
+      return false;
+    }
+    if (storeId === null || storeId === undefined) {
+      return true;
+    }
+    return normalizeStoreId(entry.storeId, storeId) === normalizeStoreId(storeId);
+  });
+
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+
+  order.internalNote = normalizeOrderInternalNote(internalNote);
   writeStore(store);
   return order;
 }
@@ -2422,6 +2518,7 @@ module.exports = {
   DEFAULT_FACEBOOK_AUTO_POST,
   DEFAULT_PAYMONGO_CHECKOUT_LINKS,
   ITEM_CATEGORIES,
+  ITEM_SIZE_OPTIONS,
   getStores,
   getStoreById,
   getStoreBySlug,
@@ -2466,6 +2563,7 @@ module.exports = {
   createOrder,
   approveOrder,
   updateOrderStatus,
+  updateOrderInternalNote,
   archiveOrder,
   unarchiveOrder,
   deleteOrder,
