@@ -830,6 +830,23 @@ function normalizeItems(store) {
       hasChanges = true;
     }
 
+    const normalizedOwnerName = normalizeItemOwner(item.ownerName || "");
+    if (item.ownerName !== normalizedOwnerName) {
+      item.ownerName = normalizedOwnerName;
+      hasChanges = true;
+    }
+
+    let normalizedFacebookLink = "";
+    try {
+      normalizedFacebookLink = normalizeOptionalHttpUrl(item.facebookLink || "", "Facebook link");
+    } catch (_error) {
+      normalizedFacebookLink = "";
+    }
+    if (item.facebookLink !== normalizedFacebookLink) {
+      item.facebookLink = normalizedFacebookLink;
+      hasChanges = true;
+    }
+
     let normalizedImageUrls;
     try {
       normalizedImageUrls = normalizeItemImageUrls(item.imageUrls || item.imageUrl);
@@ -1533,6 +1550,21 @@ function normalizeItemImageUrls(values) {
   return normalized;
 }
 
+function normalizeItemOwner(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 120);
+}
+
+function normalizeOptionalHttpUrl(value, label) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error(`${label} must start with http:// or https://`);
+  }
+  return normalized;
+}
+
 function getItemPrefixByCategory(category) {
   if (category === ITEM_CATEGORIES.CLOTHES) {
     return "CL";
@@ -1586,12 +1618,18 @@ function createItem(payload) {
   }
   const category = normalizeItemCategory(payload.category);
   const imageUrls = normalizeItemImageUrls(payload.imageUrls || payload.imageUrl);
+  const ownerName = category === ITEM_CATEGORIES.CARS ? normalizeItemOwner(payload.ownerName) : "";
+  const facebookLink = category === ITEM_CATEGORIES.CARS
+    ? normalizeOptionalHttpUrl(payload.facebookLink, "Facebook link")
+    : "";
   const item = {
     id: generateNextItemId(store, category),
     storeId,
     name: normalizeItemName(payload.name),
     category,
     size: normalizeItemSize(payload.size),
+    ownerName,
+    facebookLink,
     price: normalizeItemPrice(payload.price),
     stock: normalizeItemStock(payload.stock),
     description: normalizeItemDescription(payload.description),
@@ -1627,10 +1665,15 @@ function updateItemInventory(itemId, payload) {
   }
 
   const imageUrls = normalizeItemImageUrls(payload.imageUrls || payload.imageUrl);
+  const category = normalizeItemCategory(payload.category);
 
   item.name = normalizeItemName(payload.name);
-  item.category = normalizeItemCategory(payload.category);
+  item.category = category;
   item.size = normalizeItemSize(payload.size);
+  item.ownerName = category === ITEM_CATEGORIES.CARS ? normalizeItemOwner(payload.ownerName) : "";
+  item.facebookLink = category === ITEM_CATEGORIES.CARS
+    ? normalizeOptionalHttpUrl(payload.facebookLink, "Facebook link")
+    : "";
   item.price = normalizeItemPrice(payload.price);
   item.stock = normalizeItemStock(payload.stock);
   item.description = normalizeItemDescription(payload.description);

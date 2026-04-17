@@ -694,6 +694,14 @@
           </select>
         </div>
         <div>
+          <label for="new-item-owner-name">Owner (Cars only)</label>
+          <input id="new-item-owner-name" name="ownerName" maxlength="120" placeholder="Visible only to admin" />
+        </div>
+        <div>
+          <label for="new-item-facebook-link">FB Link (Cars only)</label>
+          <input id="new-item-facebook-link" name="facebookLink" type="url" placeholder="https://facebook.com/..." />
+        </div>
+        <div>
           <label for="new-item-live-toggle">Include in Live Selling</label>
           <select id="new-item-live-toggle" name="isLiveSelling">
             <option value="0" selected>No</option>
@@ -748,6 +756,15 @@
           <div>
             <strong><%= item.id %> - <%= item.name %></strong>
             <p class="muted"><%= item.category %><% if (item.size) { %> | Size: <%= item.size %><% } %> | <%= formatCurrency(item.price) %> | Stock: <%= item.stock %></p>
+            <% if (item.category === 'Cars' && (item.ownerName || item.facebookLink)) { %>
+              <p class="muted">
+                <% if (item.ownerName) { %>Owner: <%= item.ownerName %><% } %>
+                <% if (item.ownerName && item.facebookLink) { %> | <% } %>
+                <% if (item.facebookLink) { %>
+                  FB: <a href="<%= item.facebookLink %>" target="_blank" rel="noreferrer">Open Link</a>
+                <% } %>
+              </p>
+            <% } %>
           </div>
           <div class="inventory-actions">
             <span class="status <%= item.isBlocked ? 'needs-attention' : 'paid' %>"><%= item.isBlocked ? "Blocked" : "Active" %></span>
@@ -791,6 +808,14 @@
                   <option value="<%= sizeOption %>" <%= item.size === sizeOption ? "selected" : "" %>><%= sizeOption %></option>
                 <% }) %>
               </select>
+            </div>
+            <div>
+              <label for="inv-owner-name-<%= item.id %>">Owner (Cars only)</label>
+              <input id="inv-owner-name-<%= item.id %>" name="ownerName" maxlength="120" value="<%= item.ownerName || '' %>" placeholder="Visible only to admin" />
+            </div>
+            <div>
+              <label for="inv-facebook-link-<%= item.id %>">FB Link (Cars only)</label>
+              <input id="inv-facebook-link-<%= item.id %>" name="facebookLink" type="url" value="<%= item.facebookLink || '' %>" placeholder="https://facebook.com/..." />
             </div>
             <div>
               <label for="inv-live-toggle-<%= item.id %>">Include in Live Selling</label>
