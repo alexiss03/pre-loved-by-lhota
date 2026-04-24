@@ -19,6 +19,9 @@
     if (key === "CARS") {
       return `${storeBasePath}/shop/cars`;
     }
+    if (key === "PROPERTIES") {
+      return `${storeBasePath}/shop/properties`;
+    }
     if (key === "MISCELLANEOUS") {
       return `${storeBasePath}/shop/miscellaneous`;
     }
@@ -108,6 +111,9 @@
           <span class="item-category"><%= item.category %></span>
           <% if (item.size) { %>
             <p class="muted">Size: <strong><%= item.size %></strong></p>
+          <% } %>
+          <% if (item.category === "Properties" && item.propertyAddress) { %>
+            <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
           <% } %>
           <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
           <p class="item-description"><%= item.description %></p>

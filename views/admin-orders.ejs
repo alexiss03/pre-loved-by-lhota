@@ -702,6 +702,10 @@
           <input id="new-item-facebook-link" name="facebookLink" type="url" placeholder="https://facebook.com/..." />
         </div>
         <div>
+          <label for="new-item-property-address">Address (Properties only)</label>
+          <input id="new-item-property-address" name="propertyAddress" maxlength="180" placeholder="Visible on the listing" />
+        </div>
+        <div>
           <label for="new-item-live-toggle">Include in Live Selling</label>
           <select id="new-item-live-toggle" name="isLiveSelling">
             <option value="0" selected>No</option>
@@ -765,6 +769,9 @@
                 <% } %>
               </p>
             <% } %>
+            <% if (item.category === 'Properties' && item.propertyAddress) { %>
+              <p class="muted">Address: <%= item.propertyAddress %></p>
+            <% } %>
           </div>
           <div class="inventory-actions">
             <span class="status <%= item.isBlocked ? 'needs-attention' : 'paid' %>"><%= item.isBlocked ? "Blocked" : "Active" %></span>
@@ -816,6 +823,10 @@
             <div>
               <label for="inv-facebook-link-<%= item.id %>">FB Link (Cars only)</label>
               <input id="inv-facebook-link-<%= item.id %>" name="facebookLink" type="url" value="<%= item.facebookLink || '' %>" placeholder="https://facebook.com/..." />
+            </div>
+            <div>
+              <label for="inv-property-address-<%= item.id %>">Address (Properties only)</label>
+              <input id="inv-property-address-<%= item.id %>" name="propertyAddress" maxlength="180" value="<%= item.propertyAddress || '' %>" placeholder="Visible on the listing" />
             </div>
             <div>
               <label for="inv-live-toggle-<%= item.id %>">Include in Live Selling</label>

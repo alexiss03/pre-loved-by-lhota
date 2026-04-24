@@ -28,7 +28,7 @@
   <body data-store-theme="<%= typeof storeThemeKey === 'string' && storeThemeKey ? storeThemeKey : 'cordoba' %>">
     <% const basePath = typeof storeBasePath === "string" ? storeBasePath : ""; %>
     <% const brandLabel = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota"; %>
-    <% const visibleCategories = Array.isArray(storeAvailableCategories) ? storeAvailableCategories : ["Clothes", "Bags", "Trips", "Cars", "Miscellaneous"]; %>
+    <% const visibleCategories = Array.isArray(storeAvailableCategories) ? storeAvailableCategories : ["Clothes", "Bags", "Trips", "Cars", "Properties", "Miscellaneous"]; %>
     <header class="site-header">
       <div class="announcement-bar">
         <span class="announcement-arrow">&#8249;</span>
@@ -46,6 +46,7 @@
           <% if (visibleCategories.includes("Bags")) { %><a class="main-nav-link" href="<%= basePath %>/shop/bags">Bags</a><% } %>
           <% if (visibleCategories.includes("Trips")) { %><a class="main-nav-link" href="<%= basePath %>/shop/trips">Trips</a><% } %>
           <% if (visibleCategories.includes("Cars")) { %><a class="main-nav-link" href="<%= basePath %>/shop/cars">Cars</a><% } %>
+          <% if (visibleCategories.includes("Properties")) { %><a class="main-nav-link" href="<%= basePath %>/shop/properties">Properties</a><% } %>
           <% if (visibleCategories.includes("Miscellaneous")) { %><a class="main-nav-link" href="<%= basePath %>/shop/miscellaneous">Miscellaneous</a><% } %>
           <a class="main-nav-link" href="<%= basePath %>/cart">Cart</a>
         </nav>

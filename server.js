@@ -1441,6 +1441,9 @@ function toCategoryKey(value) {
     TRAVEL: "TRIPS",
     CAR: "CARS",
     AUTOMOTIVE: "CARS",
+    PROPERTY: "PROPERTIES",
+    REAL_ESTATE: "PROPERTIES",
+    "REAL ESTATE": "PROPERTIES",
     MISC: "MISCELLANEOUS",
     UTENSILS: "MISCELLANEOUS",
   };
@@ -1455,6 +1458,7 @@ function categoryLabelFromKey(value) {
     BAGS: "Bags",
     TRIPS: "Trips",
     CARS: "Cars",
+    PROPERTIES: "Properties",
     MISCELLANEOUS: "Miscellaneous",
   };
   return labels[key] || String(value || "").trim();
@@ -1882,6 +1886,10 @@ app.get("/shop/cars", (_req, res) => {
   res.redirect("/shop?category=CARS");
 });
 
+app.get("/shop/properties", (_req, res) => {
+  res.redirect("/shop?category=PROPERTIES");
+});
+
 app.get("/shop/bugs", (_req, res) => {
   res.redirect("/shop?category=BAGS");
 });
@@ -1904,6 +1912,10 @@ app.get("/trips", (_req, res) => {
 
 app.get("/cars", (_req, res) => {
   res.redirect("/shop/cars");
+});
+
+app.get("/properties", (_req, res) => {
+  res.redirect("/shop/properties");
 });
 
 app.get("/miscellaneous", (_req, res) => {
@@ -2209,6 +2221,14 @@ app.get("/stores/:slug/shop/cars", (req, res) => {
   res.redirect(redirectToStoreCategory(store, "CARS"));
 });
 
+app.get("/stores/:slug/shop/properties", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(redirectToStoreCategory(store, "PROPERTIES"));
+});
+
 app.get("/stores/:slug/shop/bugs", (req, res) => {
   const store = getStoreOrRedirect(req, res);
   if (!store) {
@@ -2255,6 +2275,14 @@ app.get("/stores/:slug/cars", (req, res) => {
     return;
   }
   res.redirect(`${buildStoreBasePath(store)}/shop/cars`);
+});
+
+app.get("/stores/:slug/properties", (req, res) => {
+  const store = getStoreOrRedirect(req, res);
+  if (!store) {
+    return;
+  }
+  res.redirect(`${buildStoreBasePath(store)}/shop/properties`);
 });
 
 app.get("/stores/:slug/miscellaneous", (req, res) => {
@@ -2980,6 +3008,7 @@ app.post("/admin/items/create", requireStoreOperator, itemUpload, async (req, re
       size: req.body.size,
       ownerName: req.body.ownerName,
       facebookLink: req.body.facebookLink,
+      propertyAddress: req.body.propertyAddress,
       price: req.body.price,
       stock: req.body.stock,
       isLiveSelling: String(req.body.isLiveSelling || "") === "1",
@@ -3022,6 +3051,7 @@ app.post("/admin/items/:id/inventory", requireStoreOperator, itemUpload, async (
       size: req.body.size,
       ownerName: req.body.ownerName,
       facebookLink: req.body.facebookLink,
+      propertyAddress: req.body.propertyAddress,
       price: req.body.price,
       stock: req.body.stock,
       isLiveSelling: String(req.body.isLiveSelling || "") === "1",

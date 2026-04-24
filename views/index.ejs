@@ -80,6 +80,9 @@
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
             <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+            <% } %>
             <p class="price"><%= formatCurrency(item.price) %></p>
             <a class="luxe-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View options</a>
           </div>
@@ -138,6 +141,9 @@
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
             <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+            <% } %>
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <p class="price"><%= formatCurrency(item.price) %></p>
             <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
@@ -162,6 +168,9 @@
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
+            <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
             <% } %>
             <p class="item-description"><%= item.description %></p>
             <p class="price"><%= formatCurrency(item.price) %></p>
@@ -222,6 +231,9 @@
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
             <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+            <% } %>
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <p class="price"><%= formatCurrency(item.price) %></p>
             <a class="button view-detail-btn" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>">View Details</a>
@@ -246,6 +258,9 @@
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
+            <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
             <% } %>
             <p class="price"><%= formatCurrency(item.price) %></p>
           </div>
@@ -306,6 +321,9 @@
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
             <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+            <% } %>
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <p class="item-description"><%= item.description %></p>
             <p class="stock-text"><%= item.stock %> pieces available</p>
@@ -338,6 +356,9 @@
             <span class="item-category"><%= item.category %></span>
             <% if (item.size) { %>
               <p class="muted">Size: <strong><%= item.size %></strong></p>
+            <% } %>
+            <% if (item.category === "Properties" && item.propertyAddress) { %>
+              <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
             <% } %>
             <h3><a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(item.id) %>"><%= item.name %></a></h3>
             <p class="item-description"><%= item.description %></p>

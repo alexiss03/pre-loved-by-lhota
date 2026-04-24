@@ -39,6 +39,7 @@ const ITEM_CATEGORIES = Object.freeze({
   BAGS: "Bags",
   TRIPS: "Trips",
   CARS: "Cars",
+  PROPERTIES: "Properties",
   MISCELLANEOUS: "Miscellaneous",
 });
 const ALL_ITEM_CATEGORIES = Object.freeze(Object.values(ITEM_CATEGORIES));
@@ -215,6 +216,8 @@ function normalizeStoreAvailableCategories(values) {
       normalized.push(ITEM_CATEGORIES.TRIPS);
     } else if ((value === "CARS" || value === "CAR" || value === "AUTOMOTIVE") && !normalized.includes(ITEM_CATEGORIES.CARS)) {
       normalized.push(ITEM_CATEGORIES.CARS);
+    } else if ((value === "PROPERTIES" || value === "PROPERTY" || value === "REAL ESTATE" || value === "REAL_ESTATE") && !normalized.includes(ITEM_CATEGORIES.PROPERTIES)) {
+      normalized.push(ITEM_CATEGORIES.PROPERTIES);
     } else if (
       ["MISCELLANEOUS", "MISC", "UTENSILS", "MISCELLANEOUS ITEMS"].includes(value) &&
       !normalized.includes(ITEM_CATEGORIES.MISCELLANEOUS)
@@ -607,6 +610,9 @@ function normalizeCategories(store) {
     } else if (String(item.category || "").trim().toUpperCase() === "CAR") {
       item.category = "Cars";
       hasChanges = true;
+    } else if (["PROPERTY", "REAL ESTATE", "REAL_ESTATE"].includes(String(item.category || "").trim().toUpperCase())) {
+      item.category = "Properties";
+      hasChanges = true;
     }
   }
 
@@ -620,6 +626,9 @@ function normalizeCategories(store) {
         hasChanges = true;
       } else if (String(orderItem.category || "").trim().toUpperCase() === "CAR") {
         orderItem.category = "Cars";
+        hasChanges = true;
+      } else if (["PROPERTY", "REAL ESTATE", "REAL_ESTATE"].includes(String(orderItem.category || "").trim().toUpperCase())) {
+        orderItem.category = "Properties";
         hasChanges = true;
       }
     }
@@ -844,6 +853,14 @@ function normalizeItems(store) {
     }
     if (item.facebookLink !== normalizedFacebookLink) {
       item.facebookLink = normalizedFacebookLink;
+      hasChanges = true;
+    }
+
+    const normalizedPropertyAddress = item.category === ITEM_CATEGORIES.PROPERTIES
+      ? normalizePropertyAddress(item.propertyAddress || item.address || "")
+      : "";
+    if (item.propertyAddress !== normalizedPropertyAddress) {
+      item.propertyAddress = normalizedPropertyAddress;
       hasChanges = true;
     }
 
@@ -1461,6 +1478,9 @@ function normalizeItemCategory(value) {
   if (normalized === "CARS" || normalized === "CAR" || normalized === "AUTOMOTIVE") {
     return ITEM_CATEGORIES.CARS;
   }
+  if (normalized === "PROPERTIES" || normalized === "PROPERTY" || normalized === "REAL ESTATE" || normalized === "REAL_ESTATE") {
+    return ITEM_CATEGORIES.PROPERTIES;
+  }
   if (
     normalized === "MISCELLANEOUS" ||
     normalized === "MISC" ||
@@ -1469,7 +1489,7 @@ function normalizeItemCategory(value) {
   ) {
     return ITEM_CATEGORIES.MISCELLANEOUS;
   }
-  throw new Error("Category must be Clothes, Bags, Trips, Cars, or Miscellaneous.");
+  throw new Error("Category must be Clothes, Bags, Trips, Cars, Properties, or Miscellaneous.");
 }
 
 function normalizeItemName(value) {
@@ -1565,6 +1585,10 @@ function normalizeOptionalHttpUrl(value, label) {
   return normalized;
 }
 
+function normalizePropertyAddress(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 180);
+}
+
 function getItemPrefixByCategory(category) {
   if (category === ITEM_CATEGORIES.CLOTHES) {
     return "CL";
@@ -1577,6 +1601,9 @@ function getItemPrefixByCategory(category) {
   }
   if (category === ITEM_CATEGORIES.CARS) {
     return "CR";
+  }
+  if (category === ITEM_CATEGORIES.PROPERTIES) {
+    return "PR";
   }
   return "MS";
 }
@@ -1622,6 +1649,9 @@ function createItem(payload) {
   const facebookLink = category === ITEM_CATEGORIES.CARS
     ? normalizeOptionalHttpUrl(payload.facebookLink, "Facebook link")
     : "";
+  const propertyAddress = category === ITEM_CATEGORIES.PROPERTIES
+    ? normalizePropertyAddress(payload.propertyAddress)
+    : "";
   const item = {
     id: generateNextItemId(store, category),
     storeId,
@@ -1630,6 +1660,7 @@ function createItem(payload) {
     size: normalizeItemSize(payload.size),
     ownerName,
     facebookLink,
+    propertyAddress,
     price: normalizeItemPrice(payload.price),
     stock: normalizeItemStock(payload.stock),
     description: normalizeItemDescription(payload.description),
@@ -1673,6 +1704,9 @@ function updateItemInventory(itemId, payload) {
   item.ownerName = category === ITEM_CATEGORIES.CARS ? normalizeItemOwner(payload.ownerName) : "";
   item.facebookLink = category === ITEM_CATEGORIES.CARS
     ? normalizeOptionalHttpUrl(payload.facebookLink, "Facebook link")
+    : "";
+  item.propertyAddress = category === ITEM_CATEGORIES.PROPERTIES
+    ? normalizePropertyAddress(payload.propertyAddress)
     : "";
   item.price = normalizeItemPrice(payload.price);
   item.stock = normalizeItemStock(payload.stock);

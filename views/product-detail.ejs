@@ -37,6 +37,9 @@
     <% if (item.size) { %>
       <p class="muted">Size: <strong><%= item.size %></strong></p>
     <% } %>
+    <% if (item.category === "Properties" && item.propertyAddress) { %>
+      <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+    <% } %>
     <h2><%= item.name %></h2>
     <p class="item-description"><%= item.description %></p>
     <p class="stock-text"><%= item.stock %> pieces available</p>
@@ -75,6 +78,9 @@
           <span class="item-category"><%= relatedItem.category %></span>
           <% if (relatedItem.size) { %>
             <p class="muted">Size: <strong><%= relatedItem.size %></strong></p>
+          <% } %>
+          <% if (relatedItem.category === "Properties" && relatedItem.propertyAddress) { %>
+            <p class="muted">Address: <strong><%= relatedItem.propertyAddress %></strong></p>
           <% } %>
           <h3>
             <a class="item-title-link" href="<%= storeBasePath %>/product/<%= encodeURIComponent(relatedItem.id) %>"><%= relatedItem.name %></a>

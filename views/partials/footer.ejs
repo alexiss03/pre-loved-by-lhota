@@ -2,7 +2,7 @@
     <% const basePath = typeof storeBasePath === "string" ? storeBasePath : ""; %>
     <% const cartKey = typeof storeCartKey === "string" && storeCartKey ? storeCartKey : "preloved_cart"; %>
     <% const footerStoreName = typeof storeName === "string" && storeName.trim() ? storeName : "Pre-loved by Lhota"; %>
-    <% const visibleCategories = Array.isArray(storeAvailableCategories) ? storeAvailableCategories : ["Clothes", "Bags", "Trips", "Cars", "Miscellaneous"]; %>
+    <% const visibleCategories = Array.isArray(storeAvailableCategories) ? storeAvailableCategories : ["Clothes", "Bags", "Trips", "Cars", "Properties", "Miscellaneous"]; %>
     <footer class="site-footer">
       <div class="container footer-grid">
         <section>
@@ -16,6 +16,7 @@
           <% if (visibleCategories.includes("Bags")) { %><p><a href="<%= basePath %>/shop/bags">Bags</a></p><% } %>
           <% if (visibleCategories.includes("Trips")) { %><p><a href="<%= basePath %>/shop/trips">Trips</a></p><% } %>
           <% if (visibleCategories.includes("Cars")) { %><p><a href="<%= basePath %>/shop/cars">Cars</a></p><% } %>
+          <% if (visibleCategories.includes("Properties")) { %><p><a href="<%= basePath %>/shop/properties">Properties</a></p><% } %>
           <% if (visibleCategories.includes("Miscellaneous")) { %><p><a href="<%= basePath %>/shop/miscellaneous">Miscellaneous</a></p><% } %>
         </section>
         <section>

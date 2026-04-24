@@ -37,6 +37,9 @@
         </a>
         <div class="item-card-body">
           <span class="item-category"><%= item.category %></span>
+          <% if (item.category === "Properties" && item.propertyAddress) { %>
+            <p class="muted">Address: <strong><%= item.propertyAddress %></strong></p>
+          <% } %>
           <% if (item.liveSellingLabel) { %>
             <p class="live-selling-slot">Live Slot: <strong><%= item.liveSellingLabel %></strong></p>
           <% } else { %>
