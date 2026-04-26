@@ -1508,7 +1508,7 @@ function normalizeItemDescription(value) {
   if (!normalized) {
     throw new Error("Description is required.");
   }
-  if (normalized.length > 500) {
+  if (normalized.length > 3000) {
     throw new Error("Description is too long.");
   }
   return normalized;
